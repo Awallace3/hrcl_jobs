@@ -12,7 +12,9 @@ from .sql import (
     select_table_by_column_match,
 )
 from .psi4_inps import run_mp_js_job, run_mp_js_job_test
-from .tools import np_carts_to_string, string_carts_to_np
+# from .tools import np_carts_to_string, string_carts_to_np
+from qm_tools_aw import np_carts_to_string, string_carts_to_np
+
 from mpi4py import MPI
 import numpy as np
 from .s22 import s22_testing

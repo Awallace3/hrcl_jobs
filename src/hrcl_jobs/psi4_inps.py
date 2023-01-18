@@ -7,7 +7,8 @@ from periodictable import elements
 import psi4
 from psi4 import oeprop
 from qcelemental import constants
-from .tools import np_carts_to_string
+# from .tools import np_carts_to_string
+from qm_tools_aw import np_carts_to_string
 import qcelemental as qcel
 
 """
