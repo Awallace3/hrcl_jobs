@@ -9,22 +9,28 @@ from .sql import (
     update_by_id,
 
 )
-from .psi4_inps import run_mp_js_job, run_mp_js_job_test, run_mp_js_grimme
 import os
 from glob import glob
 import time
-from .jobspec import mp_js, grimme_js
+from .jobspec import example_js
 
+def example_run_js_job(js: example_js) -> float:
+    """
+    example_run_js_job
+    """
+    v1 = js.val + 1
+    v2 = js.val + 2
+    return [v1, v2]
 
 def ms_sl_serial(
     id_list=[0, 50],
     db_path="db/dimers_all.db",
     collect_id_into_js=collect_id_into_js,
-    run_js_job=run_mp_js_grimme,
+    run_js_job=example_run_js_job,
     update_func=update_by_id,
     headers_sql=["main_id", "id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
     level_theory=["hf/aug-cc-pV(D+d)Z"],
-    js_obj=mp_js,
+    js_obj=example_js,
     ppm="4gb",
     table="main",
     id_label="main_id",

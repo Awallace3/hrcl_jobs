@@ -1,6 +1,17 @@
 from dataclasses import dataclass
 import numpy as np
 
+"""
+All dataclass_js should have id_label for ms_sl() usage to update sql db
+correctly
+"""
+
+
+@dataclass
+class example_js:
+    id_label: int
+    val: float
+
 
 @dataclass
 class mp_js:
@@ -14,6 +25,7 @@ class mp_js:
     level_theory: str
     mem: str
 
+
 @dataclass
 class grimme_js:
     id_label: int
@@ -22,6 +34,7 @@ class grimme_js:
     monBs: np.array
     level_theory: [str]
     mem: str
+
 
 @dataclass
 class saptdft_js:

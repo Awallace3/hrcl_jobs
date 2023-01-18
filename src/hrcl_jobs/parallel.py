@@ -7,29 +7,22 @@ from .sql import (
     collect_ids_into_js_ls,
     collect_id_into_js,
     update_by_id,
-    read_output
+    read_output,
 )
-from .psi4_inps import run_mp_js_job, run_mp_js_job_test, run_mp_js_grimme
 from mpi4py import MPI
 import os
 from glob import glob
 import time
-from .jobspec import mp_js
+from .jobspec import example_js
 
-"""
-Traceback (most recent call last):
-  File "/theoryfs2/ds/amwalla3/projects/apnet/datasetBuilder/main.py", line 82, in <mo dule>
-    main()
-  File "/theoryfs2/ds/amwalla3/projects/apnet/datasetBuilder/main.py", line 48, in mai n
-    ms_sl(
-  File "/theoryfs2/ds/amwalla3/projects/apnet/datasetBuilder/src/parallel.py", line 99 , in ms_sl
-    update_func(
-  File "/theoryfs2/ds/amwalla3/projects/apnet/datasetBuilder/src/sql.py", line 244, in update_rows
-    cursor.execute(
-sqlite3.ProgrammingError: Incorrect number of bindings supplied. The current statement
- uses 5, and there are 6 supplied.
 
-"""
+def example_run_js_job(js: example_js) -> float:
+    """
+    example_run_js_job
+    """
+    v1 = js.val + 1
+    v2 = js.val + 2
+    return [v1, v2]
 
 
 def ms_sl(
@@ -38,11 +31,11 @@ def ms_sl(
     db_path="db/dimers_all.db",
     collect_ids_into_js_ls=collect_ids_into_js_ls,
     collect_id_into_js=collect_id_into_js,
-    run_js_job=run_mp_js_job_test,
+    run_js_job=example_run_js_job,
     update_func=update_by_id,
     headers_sql=["main_id", "id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
     level_theory=["hf/aug-cc-pV(D+d)Z"],
-    js_obj=mp_js,
+    js_obj=example_js,
     ppm="4gb",
     table="main",
     id_label="main_id",
@@ -56,18 +49,12 @@ def ms_sl(
     ],
 ):
     """
-    To use ms_sl properly, write your own collect_rows_into_js_ls and
-    collect_row_specific_into_js functions to pass as arguements to this
-    function. Ensure that collect_rows_into_js_ls returns the correct js for
-    your own run_js_job function.
+    To use ms_sl properly, write your own run_js_job function along with an
+    appropriate js_obj dataclass.
 
-    This is designed to work with psi4 jobs using python api.
+    This was designed to work with psi4 jobs using the python api; however,
+    any user defined function for workers will work.
     """
-    # assert n_procs - 1 <= len(id_list), "must requests fewer procs than jobs"
-
-    # assert (
-    #     id_list[1] - (id_list[0] + 2 * (n_procs - 2)) > 0
-    # ), "must have at least two rounds for each process"
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
