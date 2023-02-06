@@ -60,7 +60,9 @@ def psi4_vac_mp(
     except KeyError:
         vol_ratio = np.ones(1)
     quad = np.array(wfn.variable("MBIS QUADRUPOLES"))
+    print(quad)
     quad = [q[np.triu_indices(3)] for q in quad]
+    print(quad)
     quadrupoles = np.array(quad)
     vac_multipoles = np.concatenate([charges, dipoles, quadrupoles], axis=1)
     return vac_multipoles, charges, widths, vol_ratio
