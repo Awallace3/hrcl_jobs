@@ -2,13 +2,14 @@ import os
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
-from .jobspec import mp_js, grimme_js, saptdft_js
+from .jobspec import mp_js, grimme_js, saptdft_js, mp_mon_js
 from periodictable import elements
 import psi4
 from psi4 import oeprop
 from qcelemental import constants
+
 # from .tools import np_carts_to_string
-from qm_tools_aw import np_carts_to_string
+from qm_tools_aw.tools import np_carts_to_string
 import qcelemental as qcel
 
 """
@@ -168,6 +169,19 @@ def run_mp_js_job_only_dimer(js: mp_js, el_dc=create_pt_dict()):
         vac_multipole_AB,
         vac_widths_AB,
         vac_vol_rat_AB,
+    ]
+    return output
+
+
+def run_mp_mon_js(js: mp_mon_js, el_dc=create_pt_dict()):
+    level_theory = js.level_theory[0]
+    E = np.array([el_dc[i] for i in js.Z])
+    mol_A = prep_mol(js.R, js.Z, js.TQ, E)
+    vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
+        js.mem, level_theory, mol_A
+    )
+    output = [
+        vac_multipole_AB,
     ]
     return output
 
@@ -597,14 +611,14 @@ def run_dft_neutral_cation(
         )
         e_neutral, wfn_n = psi4.energy(l, return_wfn=True)
         e_neutral = e_neutral
-        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(dense=True)
+        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+            dense=True
+        )
         HOMO = np.amax(occ_neutral)
         mol = psi4.geometry(geom_cation)
         e_cation, wfn = psi4.energy(l, return_wfn=True)
         grac = e_cation - e_neutral + HOMO
-        print(
-            f"{e_cation = } {l}\n{e_neutral = } {l}\n{HOMO = } {l}"
-        )
+        print(f"{e_cation = } {l}\n{e_neutral = } {l}\n{HOMO = } {l}")
         print(f"{grac = }")
         out.append(e_neutral)
         out.append(e_cation)
@@ -612,6 +626,7 @@ def run_dft_neutral_cation(
         out.append(grac)
         psi4.core.clean()
     return out
+
 
 def run_dft_neutral_cation_qca(
     M, charges, ppm, level_theory, d_convergence="8"
@@ -634,14 +649,14 @@ def run_dft_neutral_cation_qca(
         )
         e_neutral, wfn_n = psi4.energy(l, return_wfn=True)
         e_neutral = e_neutral
-        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(dense=True)
+        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+            dense=True
+        )
         HOMO = np.amax(occ_neutral)
         mol = psi4.geometry(geom_cation)
         e_cation, wfn = psi4.energy(l, return_wfn=True)
         grac = e_cation - e_neutral + HOMO
-        print(
-            f"{e_cation = } {l}\n{e_neutral = } {l}\n{HOMO = } {l}"
-        )
+        print(f"{e_cation = } {l}\n{e_neutral = } {l}\n{HOMO = } {l}")
         print(f"{grac = }")
         out.append(e_neutral)
         out.append(e_cation)
@@ -649,3 +664,5 @@ def run_dft_neutral_cation_qca(
         out.append(grac)
         psi4.core.clean()
     return out
+
+

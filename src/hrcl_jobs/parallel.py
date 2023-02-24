@@ -1,4 +1,4 @@
-from .sql import (
+from .sqlt import (
     establish_connection,
     update_mp_rows,
     update_rows,
@@ -54,6 +54,11 @@ def ms_sl(
 
     This was designed to work with psi4 jobs using the python api; however,
     any user defined function for workers will work.
+
+    To run with multiple procs, use following example
+    ```bash
+    mpiexec -n 2 python3 -u main.py
+    ```
     """
 
     comm = MPI.COMM_WORLD

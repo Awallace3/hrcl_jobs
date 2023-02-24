@@ -5,21 +5,7 @@ import io
 import zlib  # default compression is 6 on a ( 0-9 ) scale
 from dataclasses import dataclass
 from .jobspec import mp_js
-
-
-def establish_connection(
-    db_p="db/dimers.db",
-) -> (object, object):
-    """
-    establish_connection
-    """
-    try:
-        con = sql.connect(db_p, detect_types=sql.PARSE_DECLTYPES)
-        cur = con.cursor()
-        return con, cur
-    except sql.OperationalError:
-        print("Error with db path. Ensure all directories exist.")
-        return None, None
+import os
 
 
 def adapt_array(arr):
@@ -44,7 +30,43 @@ def convert_array(text):
 sql.register_adapter(np.ndarray, adapt_array)
 # Converts TEXT to np.array when selecting
 sql.register_converter("array", convert_array)
-sql.register_converter("ARRAY", convert_array)
+# sql.register_converter("ARRAY", convert_array)
+
+
+def establish_connection(
+    db_p="db/dimers.db",
+) -> (object, object):
+    """
+    establish_connection
+    """
+    try:
+        con = sql.connect(db_p, detect_types=sql.PARSE_DECLTYPES)
+        cur = con.cursor()
+        return con, cur
+    except sql.OperationalError:
+        print("Error with db path. Ensure all directories exist.")
+        return None, None
+
+
+def new_table(
+    db_path="db/test.db",
+    table_name="new",
+    table={
+        "id": "PRIMARY KEY",
+        "R": "array",
+        "out": "array",
+    },
+):
+    conn, cur = establish_connection(db_path)
+    headers = ",\n".join([f"{k} {v}" for k, v in table.items()])
+    if not conn:
+        return
+    table_format = f""" CREATE TABLE IF NOT EXISTS {table_name} (
+            {headers}
+            );"""
+    print(table_format)
+    create_table(conn, table_format)
+    return
 
 
 def create_table(conn, create_table_sql):
@@ -53,11 +75,11 @@ def create_table(conn, create_table_sql):
     :param create_table_sql: a CREATE TABLE statement
     :return:
     """
-    try:
-        c = conn.cursor()
-        c.execute(create_table_sql)
-    except Error as e:
-        print(e)
+    # try:
+    c = conn.cursor()
+    c.execute(create_table_sql)
+    # except Error as e:
+    #     print(e)
 
 
 def create_new_db(
@@ -109,6 +131,26 @@ def sql_np_test(
     cur.execute("select arr from test2")
     data = cur.fetchone()[0]
     return data
+
+
+def insert_new_row(
+    cur,
+    con,
+    table="main",
+    insertion=["main_id", "geometry"],
+    values=(None, 0),
+) -> None:
+    """
+    insert_new_row inserts row into a table.
+    insertion = "insert into main(main_id, geometry) values (?)",
+    values = (x,)
+    """
+    q = ",".join(["?" for i in range(len(insertion))])
+    ins = ",".join([i for i in insertion])
+    cmd = f"insert into {table}({ins}) values ({q})"
+    cur.execute(cmd, values)
+    con.commit()
+    return
 
 
 def create_new_induction_table() -> None:
@@ -419,7 +461,17 @@ def collect_id_into_js(
 """
     cursor.execute(sql_cmd)
     v = cursor.fetchone()
-    js = dataclass_obj( *v, extra_info, mem=mem,)
+    try:
+        js = dataclass_obj(
+            *v,
+            extra_info,
+            mem=mem,
+        )
+    except (TypeError):
+        print(
+            "ERROR:\n\tEXITING FROM collect_id_into_js\n\n\tCheck that id is valid!\n"
+        )
+        os.sys.exit()
     return js
 
 
@@ -433,9 +485,7 @@ def collect_ids_into_ls(
     """
     collects ids into list
     """
-    sql_cmd = (
-        f"""SELECT {outputs} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
-    )
+    sql_cmd = f"""SELECT {outputs} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
     cursor.execute(sql_cmd)
     js_ls = [i for i in cursor.fetchall()]
     return js_ls
@@ -459,7 +509,6 @@ def collect_ids_into_js_ls(
     sql_cmd = (
         f"""SELECT {cols} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
     )
-    print(sql_cmd)
     cursor.execute(sql_cmd)
     js_ls = [
         dataclass_obj(
@@ -533,7 +582,7 @@ def table_to_df_pkl(
     table="main",
     df_p="data/dimers_10k.pkl",
     id_list=[],
-    id_label="main_id"
+    id_label="main_id",
 ) -> None:
     """
     table_to_df_pkl
@@ -541,9 +590,10 @@ def table_to_df_pkl(
     con, cur = establish_connection(db_p)
     if id_list:
         cmd = f"""SELECT * FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
+        print(cmd)
         df = pd.read_sql_query(cmd, con)
     else:
-        df = pd.read_sql_query(f"SELECT * from {table}", con)
+        df = pd.read_sql_query(f"SELECT * from {table};", con)
     print(df.head())
     df.to_pickle(df_p)
     print(df.columns)
@@ -573,11 +623,7 @@ def read_output(
     """
     con, cur = establish_connection(db_path)
     r = collect_ids_into_ls(
-        cur,
-        id_list=id_list,
-        id_label=id_label,
-        table=table,
-        outputs=outputs
+        cur, id_list=id_list, id_label=id_label, table=table, outputs=outputs
     )
     for n, i in enumerate(r):
         print(f"main_id: {id_list[n]}, \t{list(i)[-5:-1]}")

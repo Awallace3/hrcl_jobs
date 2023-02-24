@@ -25,6 +25,15 @@ class mp_js:
     level_theory: str
     mem: str
 
+@dataclass
+class mp_mon_js:
+    id_label: int
+    R: np.array
+    Z: np.array
+    TQ: np.array
+    level_theory: str
+    mem: str
+
 
 @dataclass
 class grimme_js:

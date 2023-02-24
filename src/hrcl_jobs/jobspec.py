@@ -4,7 +4,10 @@ import numpy as np
 """
 All dataclass_js should have id_label for ms_sl() usage to update sql db
 correctly
+
+TODO: make own repo to consume in both hrcl submodules
 """
+
 
 
 @dataclass
@@ -22,6 +25,16 @@ class mp_js:
     ZB: np.array
     TQA: np.array
     TQB: np.array
+    level_theory: str
+    mem: str
+
+
+@dataclass
+class mp_mon_js:
+    id_label: int
+    R: np.array
+    Z: np.array
+    TQ: np.array
     level_theory: str
     mem: str
 
