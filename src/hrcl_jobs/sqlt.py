@@ -80,6 +80,7 @@ def create_table(conn, create_table_sql):
     c.execute(create_table_sql)
     # except Error as e:
     #     print(e)
+    return
 
 
 def create_new_db(

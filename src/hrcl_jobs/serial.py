@@ -1,4 +1,4 @@
-from .sql import (
+from .sqlt import (
     establish_connection,
     update_mp_rows,
     update_rows,

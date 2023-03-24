@@ -1,7 +1,7 @@
 import sqlite3 as sql
 import pandas as pd
 from .parallel import ms_sl
-from .sql import (
+from .sqlt import (
     establish_connection,
     convert_df_into_sql,
     convert_df_into_sql_mp,
@@ -11,8 +11,7 @@ from .sql import (
     collect_rows_index_range,
     select_table_by_column_match,
 )
-# from .tools import np_carts_to_string, string_carts_to_np
-from qm_tools_aw import np_carts_to_string, string_carts_to_np
+from qm_tools_aw.tools import np_carts_to_string, string_carts_to_np
 
 from mpi4py import MPI
 import numpy as np

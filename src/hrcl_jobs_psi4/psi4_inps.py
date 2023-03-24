@@ -155,7 +155,37 @@ def prep_mol(R, Z, TQ, E):
     return mol
 
 
+def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=create_pt_dict()):
+    """
+    returns [
+        vac_multipole_AB,
+        vac_widths_AB,
+        vac_vol_rat_AB,
+    ]
+    """
+    level_theory = js.level_theory[0]
+    EA = np.array([el_dc[i] for i in js.ZA])
+    EB = np.array([el_dc[i] for i in js.ZB])
+
+    # TODO:  do for dimer together - figure out how to write the mol_AB
+    mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
+    vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
+        js.mem, level_theory, mol_d
+    )
+    output = [
+        vac_multipole_AB,
+    ]
+    return output
+
+
 def run_mp_js_job_only_dimer(js: mp_js, el_dc=create_pt_dict()):
+    """
+    returns [
+        vac_multipole_AB,
+        vac_widths_AB,
+        vac_vol_rat_AB,
+    ]
+    """
     level_theory = js.level_theory[0]
     EA = np.array([el_dc[i] for i in js.ZA])
     EB = np.array([el_dc[i] for i in js.ZB])
