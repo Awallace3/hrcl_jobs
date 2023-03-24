@@ -143,7 +143,7 @@ def prep_mol_full(RA, RB, ZA, ZB, TQA, TQB, EA, EB):
     return mol
 
 
-def prep_mol(R, Z, TQ, E):
+def prep_mol(R, Z, TQ, E, ending_tags=True):
     """prep_mol creates molecular geometry for psi4 form js vars"""
     n_atoms = len(R)  # + len(RBs[i])
     n_e = np.sum(Z) + TQ
@@ -152,7 +152,8 @@ def prep_mol(R, Z, TQ, E):
     mol = f"{int(TQ)} {mult}\n"
     for j, coord in enumerate(R):
         mol += f"{E[j]} {coord[0]} {coord[1]} {coord[2]}\n"
-    mol += "symmetry c1\nno_reorient\nno_com"
+    if ending_tags:
+        mol += "symmetry c1\nno_reorient\nno_com"
     return mol
 
 
@@ -694,3 +695,60 @@ def run_dft_neutral_cation_qca(
     return out
 
 
+def run_mp_js_dimer_energy(js: mp_js) -> []:
+    """
+    run_bsse_js runs js for bsse energies
+    """
+    el_dc = create_pt_dict()
+    EA = np.array([el_dc[i] for i in js.ZA])
+    EB = np.array([el_dc[i] for i in js.ZB])
+    mol_A = prep_mol(js.RA, js.ZA, js.TQA, EA, ending_tags=False)
+    mol_B = prep_mol(js.RB, js.ZB, js.TQB, EB, ending_tags=False)
+    es = run_psi4_dimer_energy(mol_A, mol_B, js.mem, js.level_theory)
+    return es
+
+
+def run_psi4_dimer_energy(
+    A: str,
+    B: str,
+    ppm: str = "4 gb",
+    level_theory: [] = ["sapt0/cc-pvdz"],
+    charge_mult: np.array = np.array([[0, 1], [0, 1], [0, 1]]),
+    d_convergence: int = 4,
+    scf_type="df",
+) -> []:
+    """ """
+    psi4.core.be_quiet()
+    A_cm = charge_mult[1, :]
+    B_cm = charge_mult[2, :]
+    geom = f"{A}--\n{B}"
+    es = []
+    mult = constants.conversion_factor("hartree", "kcal / mol")
+    for l in level_theory:
+        m, bs = l.split("/")
+        mol = psi4.geometry(geom)
+        psi4.set_memory(ppm)
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                "basis": bs,
+            }
+        )
+        e = psi4.energy(m)
+        # e = psi4.energy(m, bsse_type="cp")
+        # ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        # ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        if "sapt" in m.lower():
+            ELST = psi4.core.variable("SAPT ELST ENERGY")
+            EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+            IND = psi4.core.variable("SAPT IND ENERGY")
+            DISP = psi4.core.variable("SAPT DISP ENERGY")
+            out_energies = np.array([e, ELST, EXCH, IND, DISP]) * mult
+            es.append(out_energies)
+        else:
+            es.append(np.array([e * mult]))
+        psi4.core.clean()
+    return es
