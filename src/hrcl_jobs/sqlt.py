@@ -64,7 +64,7 @@ def new_table(
     table_format = f""" CREATE TABLE IF NOT EXISTS {table_name} (
             {headers}
             );"""
-    print(table_format)
+    # print(table_format)
     create_table(conn, table_format)
     return
 
@@ -75,11 +75,12 @@ def create_table(conn, create_table_sql):
     :param create_table_sql: a CREATE TABLE statement
     :return:
     """
-    # try:
-    c = conn.cursor()
-    c.execute(create_table_sql)
-    # except Error as e:
-    #     print(e)
+    try:
+        c = conn.cursor()
+        c.execute(create_table_sql)
+    except Error as e:
+        # print("\nTable already exists. Skipping generation\n")
+        print(e)
     return
 
 
@@ -480,11 +481,16 @@ def return_id_list(cur, column, table_name, id_name="id", values=[0]) -> [int]:
     """
     return_id_list queries db for matches with column and returns id
     """
-    sql_cmd = (
-        f"""SELECT {id_name} FROM {table_name} WHERE {column} IN {tuple(values)};"""
-    )
-    cursor.execute(sql_cmd)
-    id_list = [i for i in cursor.fetchall()]
+    if len(values) == 1:
+        sql_cmd = (
+            f"""SELECT {id_name} FROM {table_name} WHERE {column}=={values[0]};"""
+        )
+    else:
+        sql_cmd = (
+            f"""SELECT {id_name} FROM {table_name} WHERE {column} IN {tuple(values)};"""
+        )
+    cur.execute(sql_cmd)
+    id_list = [i for i, *_ in cur.fetchall()]
     return id_list
 
 
