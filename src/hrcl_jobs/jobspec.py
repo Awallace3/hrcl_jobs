@@ -23,8 +23,8 @@ class mp_js:
     RB: np.array
     ZA: np.array
     ZB: np.array
-    TQA: np.array
-    TQB: np.array
+    TQA: float
+    TQB: float
     level_theory: str
     mem: str
 

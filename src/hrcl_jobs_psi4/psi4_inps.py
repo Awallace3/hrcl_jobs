@@ -11,6 +11,7 @@ from qcelemental import constants
 # from .tools import np_carts_to_string
 from qm_tools_aw.tools import np_carts_to_string
 import qcelemental as qcel
+from pprint import pprint as pp
 
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
@@ -159,16 +160,16 @@ def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=create_pt_dict()):
     """
     returns [
         vac_multipole_AB,
-        vac_widths_AB,
-        vac_vol_rat_AB,
     ]
     """
     level_theory = js.level_theory[0]
     EA = np.array([el_dc[i] for i in js.ZA])
     EB = np.array([el_dc[i] for i in js.ZB])
+    pp(js)
 
     # TODO:  do for dimer together - figure out how to write the mol_AB
     mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
+    print(mol_d)
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
         js.mem, level_theory, mol_d
     )

@@ -476,6 +476,18 @@ def collect_id_into_js(
     return js
 
 
+def return_id_list(cur, column, table_name, id_name="id", values=[0]) -> [int]:
+    """
+    return_id_list queries db for matches with column and returns id
+    """
+    sql_cmd = (
+        f"""SELECT {id_name} FROM {table_name} WHERE {column} IN {tuple(values)};"""
+    )
+    cursor.execute(sql_cmd)
+    id_list = [i for i in cursor.fetchall()]
+    return id_list
+
+
 def collect_ids_into_ls(
     cursor: object,
     id_list: [] = [0, 1],
