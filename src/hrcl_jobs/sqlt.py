@@ -493,6 +493,17 @@ def return_id_list(cur, column, table_name, id_name="id", values=[0]) -> [int]:
     id_list = [i for i, *_ in cur.fetchall()]
     return id_list
 
+def return_id_list_full_table(cur, table_name, id_name="id") -> [int]:
+    """
+    return_id_list queries db for matches with column and returns id
+    """
+    sql_cmd = (
+        f"""SELECT {id_name} FROM {table_name};"""
+    )
+    cur.execute(sql_cmd)
+    id_list = [i for i, *_ in cur.fetchall()]
+    return id_list
+
 
 def collect_ids_into_ls(
     cursor: object,
@@ -539,6 +550,33 @@ def collect_ids_into_js_ls(
     ]
     return js_ls
 
+def collect_ids_into_ls(
+    cursor: object,
+    headers: [] = ["id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
+    id_list: [] = [0, 1],
+    id_label: str = "id",
+    table="tcase",
+    process_func=None,
+) -> []:
+    """
+    collect_rows collects a range of rows for a table with requested headers.
+    The headers list must match the dataclass_obj's fields.
+    """
+    cols = ", ".join(headers)
+    sql_cmd = (
+        f"""SELECT {cols} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
+    )
+    cursor.execute(sql_cmd)
+    if process_func:
+        ls = [
+            process_func(i)
+            for i in cursor.fetchall()
+        ]
+    else:
+        ls = [
+                i for i in cursor.fetchall()
+        ]
+    return ls
 
 def collect_rows_into_js_ls_mp(
     cursor: object,
