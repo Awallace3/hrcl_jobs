@@ -146,7 +146,6 @@ def test_db_s22(db_p="db/test.db") -> None:
     return
 
 
-
 def test_db(db_p="db/test.db") -> None:
     """
     test_db for saptdft
@@ -200,6 +199,7 @@ def test_db(db_p="db/test.db") -> None:
     )
     return
 
+
 def test_db_2(db_p="db/test2.db") -> None:
     """
     test_db for saptdft
@@ -213,10 +213,10 @@ def test_db_2(db_p="db/test2.db") -> None:
         "charges": [],
     }
     for i in geoms:
-        d['Geometry'].append(i[0])
-        d['charges'].append(i[1])
-        d['monAs'].append(i[2])
-        d['monBs'].append(i[3])
+        d["Geometry"].append(i[0])
+        d["charges"].append(i[1])
+        d["monAs"].append(i[2])
+        d["monBs"].append(i[3])
     df = pd.DataFrame(d)
     df.to_pickle("data/test2.pkl")
 

@@ -7,12 +7,12 @@ from .sqlt import (
     read_example_output,
     collect_id_into_js,
     update_by_id,
-
 )
 import os
 from glob import glob
 import time
 from .jobspec import example_js
+
 
 def example_run_js_job(js: example_js) -> float:
     """
@@ -21,6 +21,7 @@ def example_run_js_job(js: example_js) -> float:
     v1 = js.val + 1
     v2 = js.val + 2
     return [v1, v2]
+
 
 def ms_sl_serial(
     id_list=[0, 50],
@@ -79,4 +80,3 @@ def ms_sl_serial(
     print((time.time() - start) / 60, "Minutes")
     print("COMPLETED MAIN")
     return
-

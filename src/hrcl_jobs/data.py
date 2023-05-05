@@ -372,10 +372,9 @@ def plot_charge_transfer(
     ind_charge_neutral = list(charge_neutral1.union(charge_neutral2))
 
     df["charge_diff"] = (df["TQA"] - df["TQB"]).abs()
-    df['sizeA'] = df.apply(lambda r: len(r['RA']), axis=1)
-    df['sizeB'] = df.apply(lambda r: len(r['RB']), axis=1)
-    df['sizeColor'] = df.apply(lambda r: size_shrink(r['sizeA'], r['sizeB']), axis=1)
-
+    df["sizeA"] = df.apply(lambda r: len(r["RA"]), axis=1)
+    df["sizeB"] = df.apply(lambda r: len(r["RB"]), axis=1)
+    df["sizeColor"] = df.apply(lambda r: size_shrink(r["sizeA"], r["sizeB"]), axis=1)
 
     neutral = df.copy(deep=True).loc[ind_neutral]
     charges_neutral = df.copy(deep=True).loc[ind_charge_neutral]
@@ -427,10 +426,10 @@ def plot_charge_transfer(
     # )
 
     cmap = cm.get_cmap("Spectral")
-    x = df['Ind_aug'].tolist()
-    y = df['ClassicalInd'].tolist()
-    c = df['charge_diff'].tolist()
-    c = df['sizeColor'].tolist()
+    x = df["Ind_aug"].tolist()
+    y = df["ClassicalInd"].tolist()
+    c = df["charge_diff"].tolist()
+    c = df["sizeColor"].tolist()
     fig, ax = plt.subplots(1)
     scat = ax.scatter(x, y, c=c, cmap=cmap, s=0.5)
     plt.colorbar(scat)

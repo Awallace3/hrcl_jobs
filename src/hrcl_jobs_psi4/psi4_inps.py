@@ -752,3 +752,66 @@ def run_psi4_dimer_energy(
             es.append(np.array([e * mult]))
         psi4.core.clean()
     return es
+
+def run_mp_js_grimme_components(js: grimme_js) -> np.array:
+    """
+    create_mp_js_grimme turns mp_js object into a psi4 job and runs it
+    """
+    ma, mb = [], []
+    for i in js.monAs:
+        ma.append(js.geometry[i, :])
+    for i in js.monBs:
+        mb.append(js.geometry[i, :])
+    ma = np_carts_to_string(ma)
+    mb = np_carts_to_string(mb)
+    ies = run_psi4_sapt0_components(
+        ma,
+        mb,
+        ppm=js.mem,
+        level_theory=js.level_theory,
+    )
+    return ies
+
+def run_psi4_sapt0_components(
+    A: str,
+    B: str,
+    ppm: str = "4 gb",
+    level_theory: [] = ["hf/cc-pvdz"],
+    charge_mult: np.array = np.array([[0, 1], [0, 1], [0, 1]]),
+    d_convergence: int = 4,
+    scf_type="df",
+) -> []:
+    A_cm = charge_mult[1, :]
+    B_cm = charge_mult[2, :]
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    es = []
+    for l in level_theory:
+        mol = psi4.geometry(geom)
+        psi4.set_memory(ppm)
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                # "cholesky_tolerance": 1e-6 # default about 1e-4
+                # check psi4/src/read_options
+            }
+        )
+        psi4.core.be_quiet()
+        e = psi4.energy(f"{l}")
+
+        e *= constants.conversion_factor("hartree", "kcal / mol")
+        # print(psi4.core.variables())
+
+        ELST = psi4.core.variable("SAPT ELST ENERGY")
+        EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+        IND = psi4.core.variable("SAPT IND ENERGY")
+        DISP = psi4.core.variable("SAPT DISP ENERGY")
+        ie = sum([ELST, EXCH, IND, DISP])
+        mult = constants.conversion_factor("hartree", "kcal / mol")
+        out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+        # es.append(ie)
+        es.append(out_energies)
+        psi4.core.clean()
+    return es

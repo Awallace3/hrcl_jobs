@@ -8,6 +8,7 @@ correctly
 TODO: make own repo to consume in both hrcl submodules
 """
 
+
 @dataclass
 class example_js:
     id_label: int
