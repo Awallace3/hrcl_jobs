@@ -61,12 +61,10 @@ def new_table(
     headers = ",\n".join([f"{k} {v}" for k, v in table.items()])
     if not conn:
         return
-    table_format = f""" CREATE TABLE IF NOT EXISTS {table_name} (
+    table_format = f""" CREATE TABLE {table_name} (
             {headers}
             );"""
-    # print(table_format)
-    create_table(conn, table_format)
-    return
+    return create_table(conn, table_format)
 
 
 def create_table(conn, create_table_sql):
@@ -78,10 +76,11 @@ def create_table(conn, create_table_sql):
     try:
         c = conn.cursor()
         c.execute(create_table_sql)
-    except Error as e:
-        # print("\nTable already exists. Skipping generation\n")
+    except sql.OperationalError as e:
+        # print("TABLE ALREADY EXISTS. SKIPPING GENERATION\n")
         print(e)
-    return
+        return False
+    return True
 
 
 def create_new_db(
@@ -503,27 +502,36 @@ def query_clean_match(m):
     return m
 
 
-def query_columns_for_values(cur, table_name, id_name="id", matches={
+def query_columns_for_values(cur, table_name, id_names=["id"], matches={
     "id": [0],
     }) -> [int]:
     """
     return_id_list queries db for matches with column and returns id
     """
-    print(matches)
-    where_match = []
-    for k, v in matches.items():
-        v = query_clean_match(v)
-        if len(v) == 1:
-            m = f'{k}=={v[0]}'
-        else:
-            m = f"{k} IN {tuple(v)}"
-        where_match.append(m)
-    wm = " AND ".join(where_match)
-    sql_cmd = f"""SELECT {id_name} FROM {table_name} WHERE {wm};"""
+    if type(id_names) == str:
+        id_name = id_names
+    else:
+        id_name = ", ".join(id_names)
+    if len(matches) > 0:
+        where_match = []
+        for k, v in matches.items():
+            v = query_clean_match(v)
+            if len(v) == 1:
+                m = f'{k}=={v[0]}'
+            else:
+                m = f"{k} IN {tuple(v)}"
+            where_match.append(m)
+        wm = " AND ".join(where_match)
+        sql_cmd = f"""SELECT {id_name} FROM {table_name} WHERE {wm};"""
+    else:
+        sql_cmd = f"""SELECT {id_name} FROM {table_name};"""
     print(sql_cmd)
     cur.execute(sql_cmd)
-    id_list = [i for i, *_ in cur.fetchall()]
-    return id_list
+    val_list = [i for i in cur.fetchall()]
+    for i in range(len(val_list)):
+        if len(val_list[i]) == 1:
+            val_list[i] = val_list[i][0]
+    return val_list
 
 
 def return_id_list_full_table(cur, table_name, id_name="id") -> [int]:

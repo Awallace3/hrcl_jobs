@@ -24,10 +24,9 @@ def example_run_js_job(js: example_js) -> float:
     v2 = js.val + 2
     return [v1, v2]
 
-
+# READS n_procs from comm now
 def ms_sl(
     id_list=[0, 50],
-    n_procs=50,
     db_path="db/dimers_all.db",
     collect_ids_into_js_ls=collect_ids_into_js_ls,
     collect_id_into_js=collect_id_into_js,
@@ -63,6 +62,7 @@ def ms_sl(
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    n_procs = comm.Get_size()
     print("rank", rank)
     if rank == 0:
         jobs = len(id_list)
