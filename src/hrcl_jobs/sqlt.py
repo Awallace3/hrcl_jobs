@@ -83,6 +83,23 @@ def create_table(conn, create_table_sql):
     return True
 
 
+def table_add_columns(con: sql.Connection, table_name:str, table_dict: dict,) -> bool:
+    """
+    table_add_columns insert columns into a table.
+    """
+    cur = con.execute(f"PRAGMA table_info({table_name});")
+    desc = cur.fetchall()
+    existing_table = {}
+    for i in desc:
+        existing_table[i[1]] = i[2]
+    for k, v in table_dict.items():
+        if k not in existing_table.keys():
+            print(f"Adding column {k} to {table_name}")
+            con.execute(f"ALTER TABLE {table_name} ADD COLUMN {k} {v};")
+    return True
+
+
+
 def create_new_db(
     db_name="db/main.db",
     table_name="main",
@@ -517,7 +534,10 @@ def query_columns_for_values(cur, table_name, id_names=["id"], matches={
         for k, v in matches.items():
             v = query_clean_match(v)
             if len(v) == 1:
-                m = f'{k}=={v[0]}'
+                if v[0] == '"NULL"':
+                    m = f"{k} IS NULL"
+                else:
+                    m = f'{k}=={v[0]}'
             else:
                 m = f"{k} IN {tuple(v)}"
             where_match.append(m)

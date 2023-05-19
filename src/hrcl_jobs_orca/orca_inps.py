@@ -20,7 +20,7 @@ def run_orca_input(job_sub_dir, inp_fn) -> float:
     return e
 
 
-def orca_dlpno_ccsd_ie(js: jobspec.dlpno_ie_js, omp_threads=1):
+def orca_dlpno_ccsd_ie(js: jobspec.dlpno_ie_js, omp_threads=12):
     el_dc = tools.create_el_num_to_symbol()
     energies = []
     conv = qcel.constants.conversion_factor("hartree", "kcal/mol")
