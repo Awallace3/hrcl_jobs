@@ -63,6 +63,7 @@ def orca_dlpno_ccsd_ie(js: jobspec.dlpno_ie_js, openmpi_threads=1):
        TCutPairs  {TCutPairs:.3e}    # default 1e-4
        TCutMKN    {TCutMKN:.3e}    # default 1e-3
        end
+%maxcore {js.mem}
 %scf
 MaxIter 150
 directresetfreq 10 # Default value is 15. A value of 1 (very expensive) is sometimes required. A value between 1 and 15 may be more cost-effective.
@@ -116,6 +117,7 @@ def orca_dlpno_ccsd_ie_CP(js: jobspec.dlpno_ie_js, openmpi_threads=1):
        TCutPairs  {TCutPairs:.3e}    # default 1e-4
        TCutMKN    {TCutMKN:.3e}    # default 1e-3
        end
+%maxcore {js.mem}
 %scf
 MaxIter 150
 directresetfreq 10 # Default value is 15. A value of 1 (very expensive) is sometimes required. A value between 1 and 15 may be more cost-effective.
