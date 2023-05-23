@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hrcl_jobs"
-version = "1.1.0"
+version = "1.2.0"
 authors = [
   { name="Austin M. Wallace", email="awallace43@gatech.edu" },
 ]

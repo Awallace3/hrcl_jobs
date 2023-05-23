@@ -23,7 +23,7 @@ class dlpno_ie_js:
     ZA: np.array
     ZB: np.array
     charges: np.array
-    level_theory: str
+    extra_info: dict
     mem: str
 
 def dlpno_ie_sql_headers() -> []:

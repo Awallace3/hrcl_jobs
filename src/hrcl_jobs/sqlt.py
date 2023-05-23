@@ -735,6 +735,30 @@ def table_to_df_pkl(
     return
 
 
+def table_to_df_csv(
+    db_p="db/dimers_all.db",
+    table="main",
+    df_csv="data/dimers_10k.csv",
+    id_list=[],
+    id_label="main_id",
+) -> None:
+    """
+    table_to_df_csv
+    """
+    con, cur = establish_connection(db_p)
+    if id_list:
+        cmd = f"""SELECT * FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
+        print(cmd)
+        df = pd.read_sql_query(cmd, con)
+    else:
+        df = pd.read_sql_query(f"SELECT * from {table};", con)
+    print(df)
+    df.to_csv(df_csv)
+    print(df.columns)
+    return
+
+
+
 def read_example_output(db_path="db/dimers.db", row_range=[0, 1]) -> None:
     """
     read_example_output reads sql row by rowid to verify update
