@@ -64,6 +64,7 @@ def new_table(
     table_format = f""" CREATE TABLE {table_name} (
             {headers}
             );"""
+    print(table_format)
     return create_table(conn, table_format)
 
 
@@ -83,7 +84,11 @@ def create_table(conn, create_table_sql):
     return True
 
 
-def table_add_columns(con: sql.Connection, table_name:str, table_dict: dict,) -> bool:
+def table_add_columns(
+    con: sql.Connection,
+    table_name: str,
+    table_dict: dict,
+) -> bool:
     """
     table_add_columns insert columns into a table.
     """
@@ -97,7 +102,6 @@ def table_add_columns(con: sql.Connection, table_name:str, table_dict: dict,) ->
             print(f"Adding column {k} to {table_name}")
             con.execute(f"ALTER TABLE {table_name} ADD COLUMN {k} {v};")
     return True
-
 
 
 def create_new_db(
@@ -144,9 +148,7 @@ def sql_np_test(
     cur = con.cursor()
     x = np.arange(18).reshape(3, 6)
     cur.execute("DROP TABLE IF EXISTS test2")
-    cur.execute(
-        "create table test2 (id INTEGER PRIMARY KEY AUTOINCREMENT, arr array)"
-    )
+    cur.execute("create table test2 (id INTEGER PRIMARY KEY AUTOINCREMENT, arr array)")
     cur.execute("insert into test2 (arr) values (?)", (x,))
     cur.execute("select arr from test2")
     data = cur.fetchone()[0]
@@ -503,12 +505,17 @@ def return_id_list(cur, column, table_name, id_name="id", values=[0]) -> [int]:
     if len(values) == 1:
         if values[0] == "NULL":
             op = " IS "
-        sql_cmd = f"""SELECT {id_name} FROM {table_name} WHERE {column}{op}{values[0]};"""
+        sql_cmd = (
+            f"""SELECT {id_name} FROM {table_name} WHERE {column}{op}{values[0]};"""
+        )
     else:
-        sql_cmd = f"""SELECT {id_name} FROM {table_name} WHERE {column} IN {tuple(values)};"""
+        sql_cmd = (
+            f"""SELECT {id_name} FROM {table_name} WHERE {column} IN {tuple(values)};"""
+        )
     cur.execute(sql_cmd)
     id_list = [i for i, *_ in cur.fetchall()]
     return id_list
+
 
 def query_clean_match(m):
     """
@@ -518,10 +525,67 @@ def query_clean_match(m):
         m = [f'"{i}"' for i in m]
     return m
 
+def sqlt_execute(
+    cur,
+    table_name,
+    action="SELECT",
+    extra_action="WHERE",
+    cols=["id"],
+    matches={
+        "id": [0],
+    },
+) -> [int]:
+    """
+    return_id_list queries db for matches with column and returns id
+    """
+    if type(cols) == str:
+        cols = cols
+    else:
+        cols = ", ".join(cols)
+    if len(matches) > 0:
+        where_match = []
+        for k, v in matches.items():
+            v = query_clean_match(v)
+            if len(v) == 1:
+                if v[0] == '"NULL"':
+                    m = f"{k} IS NULL"
+                else:
+                    m = f"{k}=={v[0]}"
+            else:
+                m = f"{k} IN {tuple(v)}"
+            where_match.append(m)
+        wm = " AND ".join(where_match)
+        sql_cmd = f"""{action} {cols} FROM {table_name} {extra_action} {wm};"""
+    else:
+        sql_cmd = f"""{action} {cols} FROM {table_name};"""
+    # print(sql_cmd)
+    cur.execute(sql_cmd)
+    val_list = [i for i in cur.fetchall()]
+    for i in range(len(val_list)):
+        if len(val_list[i]) == 1:
+            val_list[i] = val_list[i][0]
+    return val_list
 
-def query_columns_for_values(cur, table_name, id_names=["id"], matches={
-    "id": [0],
-    }) -> [int]:
+
+def query_distinct_columns(cur, table_name, col) -> []:
+    """
+    query_distinct_columns gets a list of distinct values for a column
+    """
+    sql_cmd = f"SELECT count({col}), {col} AS CountOf FROM {table_name} GROUP BY {col};"
+    cur.execute(sql_cmd)
+    val_list = [[i, j ]for i, j in cur.fetchall()]
+    return val_list
+
+
+
+def query_columns_for_values(
+    cur,
+    table_name,
+    id_names=["id"],
+    matches={
+        "id": [0],
+    },
+) -> [int]:
     """
     return_id_list queries db for matches with column and returns id
     """
@@ -537,7 +601,7 @@ def query_columns_for_values(cur, table_name, id_names=["id"], matches={
                 if v[0] == '"NULL"':
                     m = f"{k} IS NULL"
                 else:
-                    m = f'{k}=={v[0]}'
+                    m = f"{k}=={v[0]}"
             else:
                 m = f"{k} IN {tuple(v)}"
             where_match.append(m)
@@ -595,7 +659,9 @@ def collect_ids_into_js_ls(
     The headers list must match the dataclass_obj's fields.
     """
     cols = ", ".join(headers)
-    sql_cmd = f"""SELECT {cols} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
+    sql_cmd = (
+        f"""SELECT {cols} FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
+    )
     cursor.execute(sql_cmd)
     js_ls = [
         dataclass_obj(
@@ -643,9 +709,7 @@ def collect_ids_into_ls(
     The headers list must match the dataclass_obj's fields.
     """
     cols = ", ".join(headers)
-    sql_cmd = (
-        f"""SELECT {cols} FROM {table} WHERE {id_label} IN {tuple(id_list)};"""
-    )
+    sql_cmd = f"""SELECT {cols} FROM {table} WHERE {id_label} IN {tuple(id_list)};"""
     cursor.execute(sql_cmd)
     if process_func:
         ls = [process_func(i) for i in cursor.fetchall()]
@@ -705,9 +769,7 @@ def select_table_by_column_match(
     value="'CCCxNXdO-1_acc-carbonyl_CCxdOXNc1nccynHY1_H-Narom_37_0.73_175_29_132_25_93'",
     table="main",
 ):
-    sql_cmd = (
-        f"""SELECT {selection} FROM {table} WHERE {table}.{column}={value};"""
-    )
+    sql_cmd = f"""SELECT {selection} FROM {table} WHERE {table}.{column}={value};"""
     cursor.execute(sql_cmd)
     return cursor.fetchall()
 
@@ -758,7 +820,6 @@ def table_to_df_csv(
     return
 
 
-
 def read_example_output(db_path="db/dimers.db", row_range=[0, 1]) -> None:
     """
     read_example_output reads sql row by rowid to verify update
@@ -803,9 +864,38 @@ def delete_rows_by_search(
         sql_cmd = f"""DELETE FROM {table_name} WHERE {column}=={values[0]};"""
         print(sql_cmd)
     else:
-        sql_cmd = (
-            f"""DELETE FROM {table_name} WHERE {column} IN {tuple(values)};"""
-        )
+        sql_cmd = f"""DELETE FROM {table_name} WHERE {column} IN {tuple(values)};"""
     cur.execute(sql_cmd)
     con.commit()
     return
+
+# TODO: test function
+def create_update_table(
+    db_path: str,
+    table_name: str,
+    table_cols: dict,
+    data: dict,
+) -> bool:
+    """
+    create_update_table will either create a new table
+    or update the columns if more columns are added according to
+    the table_cols schema
+    """
+
+    table_exists = new_table(db_path, table_name, table_cols)
+    con, cur = establish_connection(db_path)
+    insertion, vals = [], []
+    for k, v in data.items():
+        insertion.append(k)
+        vals.append(v)
+    vals = tuple(vals)
+    if table_exists:
+        cnt = 0
+        for r in zip(*vals):
+            insert_new_row(cur, con, table_name, insertion, r)
+            cnt += 1
+        print(f"Inserted {cnt} rows into {table_name}")
+    else:
+        table_add_columns(con, table_name, table_cols)
+        print("Skipping Insertions...")
+    return True
