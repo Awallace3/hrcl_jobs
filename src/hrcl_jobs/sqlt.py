@@ -138,6 +138,18 @@ def create_new_db(
     return
 
 
+def drop_table(db_name="db/main.db", table_name="main") -> None:
+    """
+    drop_table drops a table from a db
+    """
+    con, cur = establish_connection(db_name)
+    if not con:
+        return
+    cur.execute(f"DROP TABLE {table_name}")
+    con.commit()
+    return
+
+
 def sql_np_test(
     # df
 ) -> None:
@@ -358,6 +370,9 @@ def update_by_id(
     """
     update_mp_rows
     """
+    if len(output_columns) != len(output):
+        print("OUTPUT_COLUMNS AND OUTPUT MUST BE THE SAME LENGTH!", id_value)
+        return
     headers = ",\n".join([f"{i} = ?" for i in output_columns])
     cmd = f"""
         UPDATE {table}
@@ -366,8 +381,6 @@ def update_by_id(
         WHERE
             {id_label}=?;
     """
-    # print(cmd)
-    # print("OUTPUT:", (*tuple(output), id_value))
     cursor.execute(
         cmd,
         (*tuple(output), id_value),
@@ -473,6 +486,7 @@ def collect_id_into_js(
     id_value: int = 0,
     id_label: str = "main_id",
     table="main",
+    # *args,
 ) -> []:
     """
     collect_rows collects a range of rows for a table with requested headers.
@@ -483,16 +497,20 @@ def collect_id_into_js(
 """
     cursor.execute(sql_cmd)
     v = cursor.fetchone()
+    js = dataclass_obj(
+        *v,
+        extra_info,
+        mem=mem,
+        # *args,
+    )
     try:
         js = dataclass_obj(
             *v,
             extra_info,
             mem=mem,
         )
-    except (TypeError):
-        print(
-            "ERROR:\n\tEXITING FROM collect_id_into_js\n\n\tCheck that id is valid!\n"
-        )
+    except TypeError as e:
+        print(e)
         os.sys.exit()
     return js
 
@@ -525,6 +543,7 @@ def query_clean_match(m):
         m = [f'"{i}"' for i in m]
     return m
 
+
 def sqlt_execute(
     cur,
     table_name,
@@ -532,8 +551,9 @@ def sqlt_execute(
     extra_action="WHERE",
     cols=["id"],
     matches={
-        "id": [0],
+        # "id": [0],
     },
+    joiner="AND",
 ) -> [int]:
     """
     return_id_list queries db for matches with column and returns id
@@ -549,16 +569,19 @@ def sqlt_execute(
             if len(v) == 1:
                 if v[0] == '"NULL"':
                     m = f"{k} IS NULL"
+                elif type(v[0]) == str and "!" in v[0]:
+                    # m = f"{k}!='{v[0][1:-1]}'"
+                    m = f"{k} NOT LIKE '{v[0][2:-1]}'"
                 else:
                     m = f"{k}=={v[0]}"
             else:
                 m = f"{k} IN {tuple(v)}"
+
             where_match.append(m)
-        wm = " AND ".join(where_match)
+        wm = f" {joiner} ".join(where_match)
         sql_cmd = f"""{action} {cols} FROM {table_name} {extra_action} {wm};"""
     else:
         sql_cmd = f"""{action} {cols} FROM {table_name};"""
-    # print(sql_cmd)
     cur.execute(sql_cmd)
     val_list = [i for i in cur.fetchall()]
     for i in range(len(val_list)):
@@ -572,10 +595,10 @@ def query_distinct_columns(cur, table_name, col) -> []:
     query_distinct_columns gets a list of distinct values for a column
     """
     sql_cmd = f"SELECT count({col}), {col} AS CountOf FROM {table_name} GROUP BY {col};"
+    # print(sql_cmd)
     cur.execute(sql_cmd)
-    val_list = [[i, j ]for i, j in cur.fetchall()]
+    val_list = [[i, j] for i, j in cur.fetchall()]
     return val_list
-
 
 
 def query_columns_for_values(
@@ -709,7 +732,12 @@ def collect_ids_into_ls(
     The headers list must match the dataclass_obj's fields.
     """
     cols = ", ".join(headers)
-    sql_cmd = f"""SELECT {cols} FROM {table} WHERE {id_label} IN {tuple(id_list)};"""
+    if len(id_list) > 1:
+        sql_cmd = (
+            f"""SELECT {cols} FROM {table} WHERE {id_label} IN {tuple(id_list)};"""
+        )
+    else:
+        sql_cmd = f"""SELECT {cols} FROM {table} WHERE {id_label}=={id_list[0]};"""
     cursor.execute(sql_cmd)
     if process_func:
         ls = [process_func(i) for i in cursor.fetchall()]
@@ -869,6 +897,7 @@ def delete_rows_by_search(
     con.commit()
     return
 
+
 # TODO: test function
 def create_update_table(
     db_path: str,
@@ -885,9 +914,14 @@ def create_update_table(
     table_exists = new_table(db_path, table_name, table_cols)
     con, cur = establish_connection(db_path)
     insertion, vals = [], []
+    v_len = len(data[list(data.keys())[0]])
     for k, v in data.items():
         insertion.append(k)
         vals.append(v)
+        if len(v) != v_len:
+            print("ERROR: data length mismatch", k, len(v), v_len)
+            return False
+
     vals = tuple(vals)
     if table_exists:
         cnt = 0

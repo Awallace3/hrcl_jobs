@@ -209,6 +209,39 @@ def run_mp_mon_js(js: mp_mon_js, el_dc=create_pt_dict()):
     ]
     return output
 
+def run_mp_js_job_vac_only(js: mp_js, el_dc=create_pt_dict()) -> np.array:
+    """
+    create_mp_js_job turns mp_js object into a psi4 job and runs it
+    """
+    level_theory = js.level_theory[0]
+    EA = np.array([el_dc[i] for i in js.ZA])
+    EB = np.array([el_dc[i] for i in js.ZB])
+
+    mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
+    # print(f"mol_d: {mol_d}")
+    vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
+        js.mem, level_theory, mol_d)
+
+    mol_A = prep_mol(js.RA, js.ZA, js.TQA, EA)
+    # print(f"mol_A: {mol_A}")
+    vac_multipole_A, charges_A, vac_widths_A, vac_vol_rat_A = psi4_vac_mp(
+        js.mem, level_theory, mol_A)
+
+    mol_B = prep_mol(js.RB, js.ZB, js.TQB, EB)
+    # print(f"mol_B: {mol_B}")
+    vac_multipole_B, charges_B, vac_widths_B, vac_vol_rat_B = psi4_vac_mp(
+        js.mem, level_theory, mol_B)
+
+    env_multipole_A, env_widths_A, env_vol_rat_A = psi4_env_mp(
+        js.mem, level_theory, mol_A, js.RB, charges_B)
+    env_multipole_B, env_widths_B, env_vol_rat_B = psi4_env_mp(
+        js.mem, level_theory, mol_B, js.RA, charges_A)
+    output = [
+        vac_multipole_A,
+        vac_multipole_B,
+        vac_multipole_AB,
+    ]
+    return output
 
 def run_mp_js_job(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     """
@@ -523,6 +556,17 @@ def run_saptdft(js: saptdft_js) -> np.array:
     # shift_a.extend(ies)
     return shift_a
 
+def run_saptdft_grac_shift(js: saptdft_mon_grac_js):
+    mn = []
+    for i in js.monNs:
+        mn.append(js.geometry[i, :])
+    mn = np_carts_to_string(mn)
+    shift_n = run_dft_neutral_cation(mn,
+                                     charges=js.charges[1],
+                                     ppm=js.mem,
+                                     level_theory=js.level_theory)
+    return shift_n
+
 
 def run_saptdft(js: saptdft_js) -> np.array:
     """
@@ -543,7 +587,6 @@ def run_saptdft(js: saptdft_js) -> np.array:
                                      charges=js.charges[2],
                                      ppm=js.mem,
                                      level_theory=js.level_theory)
-    shift_a.extend(shift_b)
     ies = run_psi4_saptdft(
         ma,
         mb,
@@ -552,6 +595,7 @@ def run_saptdft(js: saptdft_js) -> np.array:
         sapt_dft_grac_shift_a=shift_a[-1],
         sapt_dft_grac_shift_b=shift_b[-1],
     )
+    shift_a.extend(shift_b)
     shift_a.extend(ies)
     return shift_a
 

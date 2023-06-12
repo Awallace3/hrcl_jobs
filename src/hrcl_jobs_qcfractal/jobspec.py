@@ -87,6 +87,7 @@ class saptdft_mon_grac_js:
     monNs: np.array
     charges: np.array
     level_theory: [str]
+    client: object
     mem: str
 
 
@@ -97,5 +98,6 @@ def saptdft_mon_grac_js_headers(monNs="monAs"):
         f"{monNs}",
         "charges",
         "level_theory",
+        "client",
         "mem",
     ]

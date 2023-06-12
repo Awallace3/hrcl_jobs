@@ -1,3 +1,4 @@
+from . import sqlt
 from .sqlt import (
     establish_connection,
     update_mp_rows,
@@ -59,6 +60,110 @@ def ms_sl_serial(
     for n, active_ind in enumerate(id_list):
         js = collect_id_into_js(
             cur,
+            mem=ppm,
+            headers=headers_sql,
+            extra_info=level_theory,
+            dataclass_obj=js_obj,
+            id_value=active_ind,
+            id_label=id_label,
+            table=table,
+        )
+        output = run_js_job(js)
+        update_func(
+            con,
+            cur,
+            output,
+            id_label=id_label,
+            id_value=active_ind,
+            table=table,
+            output_columns=output_columns,
+        )
+    print((time.time() - start) / 60, "Minutes")
+    print("COMPLETED MAIN")
+    return
+
+
+def job_runner(
+    id_list=[0, 50],
+    db_path="db/schr.db",
+    table_name="main",
+    js_obj=example_js,
+    headers_sql=["id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
+    run_js_job=example_run_js_job,
+    extra_info=["sapt0/aug-cc-pV(D+d)Z"],
+    ppm="4gb",
+    id_label="id",
+    output_columns=[
+        "env_multipole_A",
+        "env_multipole_B",
+    ],
+    # The user does not need to change the following unless desired
+    collect_id_into_js=collect_id_into_js,
+    update_func=update_by_id,
+):
+    """
+    This is designed to work with psi4 jobs using python api.
+    """
+
+    start = time.time()
+    first = True
+    con, cur = establish_connection(db_p=db_path)
+    for n, active_ind in enumerate(id_list):
+        js = collect_id_into_js(
+            cur,
+            mem=ppm,
+            headers=headers_sql,
+            extra_info=extra_info,
+            dataclass_obj=js_obj,
+            id_value=active_ind,
+            id_label=id_label,
+            table=table,
+        )
+        output = run_js_job(js)
+        update_func(
+            con,
+            cur,
+            output,
+            id_label=id_label,
+            id_value=active_ind,
+            table=table,
+            output_columns=output_columns,
+        )
+    print((time.time() - start) / 60, "Minutes")
+    print("COMPLETED MAIN")
+    return
+
+
+def job_runner_qcf(
+    id_list=[0, 50],
+    db_path="db/schr.db",
+    table_name="main",
+    js_obj=example_js,
+    headers_sql=["id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
+    run_js_job=example_run_js_job,
+    extra_info=["sapt0/aug-cc-pV(D+d)Z"],
+    ppm="4gb",
+    id_label="id",
+    output_columns=[
+        "env_multipole_A",
+        "env_multipole_B",
+    ],
+    client_url="localhost:7778",
+    # The user does not need to change the following unless desired
+    collect_id_into_js=collect_id_into_js,
+    update_func=update_by_id,
+):
+    from qcfractal.interface import FractalClient
+    from qcfractal import FractalServer
+    client = FractalClient(client_url, verify=False)
+
+    start = time.time()
+    first = True
+    con, cur = establish_connection(db_p=db_path)
+    for n, active_ind in enumerate(id_list):
+        js = sqlt.collect_id_into_js_qca(
+            cur,
+            client=client,
             mem=ppm,
             headers=headers_sql,
             extra_info=level_theory,

@@ -202,7 +202,7 @@ def ms_sl_extra_info(
     js_obj=example_js,
     ppm="4gb",
     table="main",
-    id_label="main_id",
+    id_label="id",
     output_columns=[
         "env_multipole_A",
         "env_multipole_B",
@@ -265,6 +265,7 @@ def ms_sl_extra_info(
             req = comm.isend(js, dest=n, tag=2)
             req.wait()
             print(f"{n} / {jobs}")
+
         id_list_extra = id_list[len(r) :]
         # active_ind = jobs + n_procs - 1
         # while active_ind <= jobs:
