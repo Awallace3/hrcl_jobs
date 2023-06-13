@@ -3,15 +3,17 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from .jobspec import mp_js, grimme_js, saptdft_js, mp_mon_js
+from . import jobspec
 from periodictable import elements
 import psi4
 from psi4 import oeprop
 from qcelemental import constants
 
-# from .tools import np_carts_to_string
-from qm_tools_aw.tools import np_carts_to_string
+# from .tools import tools.np_carts_to_string
+from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
+
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
 
@@ -316,8 +318,8 @@ def run_mp_js_grimme(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_sapt0(
         ma,
         mb,
@@ -336,8 +338,8 @@ def run_mp_js_grimme_no_cp(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_sapt0(ma,
                          mb,
                          ppm=js.mem,
@@ -355,8 +357,8 @@ def run_mp_js_grimme_fsapt(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
 
     ies_parts = run_psi4_fsapt(ma,
                                mb,
@@ -374,8 +376,8 @@ def run_mp_js_grimme_no_df(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
 
     ies = run_psi4_sapt0(
         # ma, mb, ppm=js.mem, level_theory=js.level_theory, cp=True, scf_type="direct"
@@ -535,8 +537,8 @@ def run_saptdft(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     shift_a = run_dft_neutral_cation(ma,
                                      charges=js.charges[1],
                                      ppm=js.mem,
@@ -560,7 +562,7 @@ def run_saptdft(js: saptdft_js) -> np.array:
 #     mn = []
 #     for i in js.monNs:
 #         mn.append(js.geometry[i, :])
-#     mn = np_carts_to_string(mn)
+#     mn = tools.np_carts_to_string(mn)
 #     shift_n = run_dft_neutral_cation(mn,
 #                                      charges=js.charges[1],
 #                                      ppm=js.mem,
@@ -577,8 +579,8 @@ def run_saptdft(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     shift_a = run_dft_neutral_cation(ma,
                                      charges=js.charges[1],
                                      ppm=js.mem,
@@ -649,8 +651,8 @@ def run_saptdft_no_grac(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_saptdft(ma, mb, ppm=js.mem, level_theory=js.level_theory)
     return ies
 
@@ -794,8 +796,8 @@ def run_mp_js_grimme_components(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_sapt0_components(
         ma,
         mb,
@@ -847,3 +849,39 @@ def run_psi4_sapt0_components(
         es.append(out_energies)
         psi4.core.clean()
     return es
+
+
+def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
+    """
+    ma, mb = [], []
+    for i in js.monAs:
+        ma.append(js.geometry[i, :])
+    for i in js.monBs:
+        mb.append(js.geometry[i, :])
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+    charges = [[0,1] for i in range(3)]
+    geom = f"{charges[1][0]} {charges[1][1]}\n{ma}"
+    geom += f"--\n{charges[2][0]} {charges[2][1]}\n{mb}"
+
+    out = []
+    psi4.core.be_quiet()
+    level_theory = js.extra_info["level_theory"]
+    for l in level_theory:
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
+        if js.extra_info['bsse_type'] == "cp":
+            e = psi4.energy(l, bsse_type="cp")
+            ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        elif js.extra_info['bsse_type'] == "nocp":
+            e = psi4.energy(l, bsse_type="nocp")
+            ie = psi4.core.variable("NOCP-CORRECTED INTERACTION ENERGY")
+        else:
+            print("bsse_type must be cp or nocp")
+            raise ValueError()
+        ie *= constants.conversion_factor("hartree", "kcal / mol")
+    return out
+

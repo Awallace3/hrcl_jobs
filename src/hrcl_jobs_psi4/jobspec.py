@@ -99,3 +99,22 @@ def saptdft_mon_grac_js_headers(monNs="monAs"):
         "level_theory",
         "mem",
     ]
+
+@dataclass
+class psi4_dimer_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    extra_info: {}
+    mem: str
+
+
+def psi4_dimer_js_headers():
+    return [
+        "main_id",
+        "geometry",
+        "monAs",
+        "monBs",
+    ]
+

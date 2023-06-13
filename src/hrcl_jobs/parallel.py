@@ -193,15 +193,13 @@ def ms_sl(
 def ms_sl_extra_info(
     id_list=[0, 50],
     db_path="db/dimers_all.db",
-    collect_ids_into_js_ls=collect_ids_into_js_ls,
-    collect_id_into_js=collect_id_into_js,
     run_js_job=example_run_js_job,
     update_func=update_by_id,
     extra_info=[],
     headers_sql=["main_id", "id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
     js_obj=example_js,
     ppm="4gb",
-    table="main",
+    table_name="main",
     id_label="id",
     output_columns=[
         "env_multipole_A",
@@ -239,26 +237,26 @@ def ms_sl_extra_info(
         if len(id_list) == 1 or n_procs == 2:
             js = collect_id_into_js(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_value=id_list[0],
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                id_list[0],
+                id_label,
+                table_name,
             )
             r = [js]
 
         else:
             r = collect_ids_into_js_ls(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_list=id_list_first,
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                id_list_first,
+                id_label,
+                table_name,
             )
         for n, js in enumerate(r):
             n = n + 1
@@ -275,13 +273,13 @@ def ms_sl_extra_info(
             id_value = output.pop()
             js = collect_id_into_js(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_value=active_ind,
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                active_ind,
+                id_label,
+                table_name,
             )
             comm.send(js, dest=target_proc, tag=2)
             i1 = time.time()
@@ -299,7 +297,7 @@ def ms_sl_extra_info(
                 output,
                 id_label=id_label,
                 id_value=id_value,
-                table=table,
+                table=table_name,
                 output_columns=output_columns,
             )
             i2 = time.time() - i1
@@ -322,7 +320,7 @@ def ms_sl_extra_info(
                 output,
                 id_label=id_label,
                 id_value=id_value,
-                table=table,
+                table=table_name,
                 output_columns=output_columns,
             )
             comm.send(0, dest=target_proc, tag=2)
