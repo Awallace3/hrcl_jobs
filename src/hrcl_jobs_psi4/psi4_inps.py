@@ -556,16 +556,16 @@ def run_saptdft(js: saptdft_js) -> np.array:
     # shift_a.extend(ies)
     return shift_a
 
-def run_saptdft_grac_shift(js: saptdft_mon_grac_js):
-    mn = []
-    for i in js.monNs:
-        mn.append(js.geometry[i, :])
-    mn = np_carts_to_string(mn)
-    shift_n = run_dft_neutral_cation(mn,
-                                     charges=js.charges[1],
-                                     ppm=js.mem,
-                                     level_theory=js.level_theory)
-    return shift_n
+# def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+#     mn = []
+#     for i in js.monNs:
+#         mn.append(js.geometry[i, :])
+#     mn = np_carts_to_string(mn)
+#     shift_n = run_dft_neutral_cation(mn,
+#                                      charges=js.charges[1],
+#                                      ppm=js.mem,
+#                                      level_theory=js.level_theory)
+#     return shift_n
 
 
 def run_saptdft(js: saptdft_js) -> np.array:

@@ -486,7 +486,7 @@ def collect_id_into_js(
     id_value: int = 0,
     id_label: str = "main_id",
     table="main",
-    # *args,
+    *args,
 ) -> []:
     """
     collect_rows collects a range of rows for a table with requested headers.
@@ -497,17 +497,12 @@ def collect_id_into_js(
 """
     cursor.execute(sql_cmd)
     v = cursor.fetchone()
-    js = dataclass_obj(
-        *v,
-        extra_info,
-        mem=mem,
-        # *args,
-    )
     try:
         js = dataclass_obj(
             *v,
             extra_info,
             mem=mem,
+            *args,
         )
     except TypeError as e:
         print(e)

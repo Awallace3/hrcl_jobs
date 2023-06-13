@@ -12,16 +12,22 @@ from . import jobspec
 
 
 def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
+    """
     mn = []
     for i in js.monNs:
         mn.append(js.geometry[i, :])
-    mn = np_carts_to_string(mn)
+    mn = tools.np_carts_to_string(mn)
+    print(js)
     shift_n = run_dft_neutral_cation_qca_qcng_error(
         js.client,
         mn,
-        charges=js.charges[1],
+        charges=js.charges[js.extra_info['charge_index']],
         ppm=js.mem,
-        level_theory=js.level_theory,
+        id_label=js.id_label,
+        level_theory=js.extra_info['level_theory'],
+        mon=js.extra_info['charge_index'],
     )
     return shift_n
 
@@ -34,8 +40,7 @@ def run_dft_neutral_cation_qca_qcng_error(
     id_label,
     level_theory,
     mon,
-    d_convergence="8",
-    gather_results=False,
+    gather_results=True,
     print_file=False,
     options={"reference": "uhf"},
 ) -> np.array:
@@ -207,8 +212,7 @@ def run_saptdft_with_grads(
     charges,
     ppm,
     level_theory,
-    d_convergence="8",
-    gather_results=False,
+    gather_results=True,
     sapt_dft_grac_shift_a: float = 1e-16,
     sapt_dft_grac_shift_b: float = 1e-16,
     print_file: bool = True,
@@ -317,7 +321,7 @@ def run_saptdft_with_grads(
         return out
 
 
-def run_saptdft_qcng(js: saptdft_js) -> np.array:
+def run_saptdft_qcng(js: jobspec.saptdft_js) -> np.array:
     """
     run_saptdft computes scaling factor and uses to run SAPT-DFT
     """

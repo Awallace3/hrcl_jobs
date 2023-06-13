@@ -70,7 +70,7 @@ class saptdft_js:
 
 def saptdft_js_headers():
     return [
-        "id_label",
+        "main_id",
         "geometry",
         "monAs",
         "monBs",
@@ -86,18 +86,15 @@ class saptdft_mon_grac_js:
     geometry: np.array
     monNs: np.array
     charges: np.array
-    level_theory: [str]
+    extra_info: {}
     client: object
     mem: str
 
 
 def saptdft_mon_grac_js_headers(monNs="monAs"):
     return [
-        "id_label",
+        "main_id",
         "geometry",
         f"{monNs}",
         "charges",
-        "level_theory",
-        "client",
-        "mem",
     ]
