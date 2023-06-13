@@ -68,6 +68,7 @@ class saptdft_js:
     level_theory: [str]
     mem: str
 
+
 def saptdft_js_headers():
     return [
         "main_id",
@@ -79,6 +80,27 @@ def saptdft_js_headers():
         "mem",
     ]
 
+
+@dataclass
+class psi4_dimer_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    charges: np.array
+    extra_info: {}
+    client: object
+    mem: str
+
+
+def psi4_dimer_js():
+    return [
+        "main_id",
+        "geometry",
+        "monAs",
+        "monBs",
+        "charges",
+    ]
 
 @dataclass
 class saptdft_mon_grac_js:

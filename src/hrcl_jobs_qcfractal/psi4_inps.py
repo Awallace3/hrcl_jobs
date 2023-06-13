@@ -11,6 +11,56 @@ import qcfractal.interface as qcfi
 from . import jobspec
 
 
+def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
+    """
+    ma, mb = [], []
+    for i in js.monAs:
+        ma.append(js.geometry[i, :])
+    for i in js.monBs:
+        mb.append(js.geometry[i, :])
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+
+    import qcfractal.interface as qcfi
+
+    kw = qcfi.models.KeywordSet(**{"values": js.extra_info['options']})
+    kw_id = client.add_keywords([kw])[0]
+
+    geom = f"{charges[0]} {charges[1]}\n{M}"
+    geom_in = qcfi.Molecule.from_data(geom)
+    out = []
+    psi4.core.be_quiet()
+    level_theory = js.extra_info["level_theory"]
+    for l in level_theory:
+        m, bs = l.split("/")
+        r1 = client.add_compute(
+            program="psi4",
+            method=l,
+            basis=bs,
+            driver="energy",
+            molecule=[geom_in],
+            keywords=kw_id,
+            protocols={"bsse_type": js.extra_info['bsse_type']},
+        )
+        try:
+            id1 = int(r1.ids[0])
+            ret1 = client.query_results(id=r1.ids)[0]
+            result1 = ret1.dict()
+            if js.extra_info['bsse_type'] == "cp":
+                ie = result1["extras"]["qcvars"]["CP-CORRECTED INTERACTION ENERGY"]
+            elif js.extra_info['bsse_type'] == "nocp":
+                ie = result1["extras"]["qcvars"]["NOCP-CORRECTED INTERACTION ENERGY"]
+            else:
+                print("bsse_type not recognized")
+                raise ValueError
+            out.append(ie)
+        except (AttributeError, TypeError):
+            out.append(None)
+        return out
+
+
 def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
@@ -23,11 +73,11 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
     shift_n = run_dft_neutral_cation_qca_qcng_error(
         js.client,
         mn,
-        charges=js.charges[js.extra_info['charge_index']],
+        charges=js.charges[js.extra_info["charge_index"]],
         ppm=js.mem,
         id_label=js.id_label,
-        level_theory=js.extra_info['level_theory'],
-        mon=js.extra_info['charge_index'],
+        level_theory=js.extra_info["level_theory"],
+        mon=js.extra_info["charge_index"],
     )
     return shift_n
 
