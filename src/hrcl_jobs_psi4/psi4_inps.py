@@ -883,5 +883,7 @@ def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
             print("bsse_type must be cp or nocp")
             raise ValueError()
         ie *= constants.conversion_factor("hartree", "kcal / mol")
+        print(ie)
+        out.append(ie)
     return out
 

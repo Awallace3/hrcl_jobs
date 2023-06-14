@@ -112,8 +112,8 @@ class psi4_dimer_js:
 
 def psi4_dimer_js_headers():
     return [
-        "main_id",
-        "geometry",
+        "id",
+        "Geometry",
         "monAs",
         "monBs",
     ]
