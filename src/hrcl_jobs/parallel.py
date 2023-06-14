@@ -349,6 +349,6 @@ def ms_sl_extra_info(
                 output.append(js.id_label)
                 output.append(rank)
                 comm.send(output, dest=0, tag=2)
-                print(f"rank: {rank} TOOK {time.time() - s} seconds")
+                print(f"rank: {rank} spent {time.time() - s} seconds on {js.id_label}")
         print(rank, "TERMINATING")
         return
