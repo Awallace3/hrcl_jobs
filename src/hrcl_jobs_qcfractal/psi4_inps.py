@@ -6,8 +6,6 @@ import psi4
 from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
-import qcfractal.interface as qcfi
-
 from . import jobspec
 
 
