@@ -295,8 +295,8 @@ def ms_sl_extra_info(
                 con,
                 cur,
                 output,
-                id_label=id_label,
                 id_value=id_value,
+                id_label=id_label,
                 table=table_name,
                 output_columns=output_columns,
             )

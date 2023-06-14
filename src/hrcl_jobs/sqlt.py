@@ -224,6 +224,19 @@ def subset_df(index_split=range(10000, 10050)):
     return
 
 
+def update_column_value(con, cur, table_name, column_name, value):
+    """
+    update_column_value
+    """
+    try:
+        cur.execute(f"UPDATE {table_name} SET {column_name} = {value}")
+        con.commit()
+    except (e):
+        print(e)
+        return False
+    return True
+
+
 def convert_df_into_sql(
     df_p="df.pkl",
     db_p="db/sql.db",
@@ -270,20 +283,27 @@ def convert_df_into_sql(
         elif v.lower() == "integer primary key":
             df[k] = [i for i in range(len(df))]
         else:
-            raise TypeError()
+            print(f"Ensure that {v} is a valid SQL type.")
+            df[k] = [None for i in range(len(df))]
         input_columns[k] = v
     df = df[[i for i in input_columns.keys()]]
     # print(input_columns)
     print(df.columns)
     print(df)
     print("built df...")
+    table_name = "main"
     df.to_sql(
-        "main",
+        table_name,
         con,
         if_exists="replace",
         index=False,
         dtype=input_columns,
     )
+    print("built sql...")
+    for k, v in output_columns.items():
+        if v.lower() == "array":
+            print(v)
+            update_column_value(con, cur, table_name, k, "NULL")
     return
 
 
