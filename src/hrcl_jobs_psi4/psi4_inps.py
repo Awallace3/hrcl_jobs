@@ -885,5 +885,5 @@ def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
         ie *= constants.conversion_factor("hartree", "kcal / mol")
         print(ie)
         out.append(ie)
-    return out
+    return np.array(out)
 
