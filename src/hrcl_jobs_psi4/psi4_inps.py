@@ -831,10 +831,13 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
 
     A_cm = js.charges[1, :]
     B_cm = js.charges[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{ma}--\n{A_cm[0]} {A_cm[1]}\n{mb}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{ma}--\n{B_cm[0]} {B_cm[1]}\n{mb}"
     es = []
     for l in js.extra_info["level_theory"]:
 
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
         if generate_outputs:
             job_dir = js.extra_info["out"]["path"]
             clean_name = (
@@ -844,9 +847,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
             os.makedirs(job_dir, exist_ok=True)
             psi4.set_output_file(f"{job_dir}/psi4.out", False)
 
-        mol = psi4.geometry(geom)
-        psi4.set_memory(js.mem)
-        psi4.set_options(js.extra_info["options"])
         e = psi4.energy(f"{l}")
 
         e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -859,7 +859,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         ie = sum([ELST, EXCH, IND, DISP])
         mult = constants.conversion_factor("hartree", "kcal / mol")
         out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
-        # es.append(ie)
         es.append(out_energies)
 
         if generate_outputs:
