@@ -231,7 +231,7 @@ def update_column_value(con, cur, table_name, column_name, value):
     try:
         cur.execute(f"UPDATE {table_name} SET {column_name} = {value}")
         con.commit()
-    except (e):
+    except e:
         print(e)
         return False
     return True
@@ -928,17 +928,17 @@ def create_update_table(
 
     table_exists = new_table(db_path, table_name, table_cols)
     con, cur = establish_connection(db_path)
-    insertion, vals = [], []
-    v_len = len(data[list(data.keys())[0]])
-    for k, v in data.items():
-        insertion.append(k)
-        vals.append(v)
-        if len(v) != v_len:
-            print("ERROR: data length mismatch", k, len(v), v_len)
-            return False
-
-    vals = tuple(vals)
     if table_exists:
+        insertion, vals = [], []
+        v_len = len(data[list(data.keys())[0]])
+        for k, v in data.items():
+            insertion.append(k)
+            vals.append(v)
+            if len(v) != v_len:
+                print("ERROR: data length mismatch", k, len(v), v_len)
+                return False
+
+        vals = tuple(vals)
         cnt = 0
         for r in zip(*vals):
             insert_new_row(cur, con, table_name, insertion, r)

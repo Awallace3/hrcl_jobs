@@ -24,6 +24,7 @@ def example_run_js_job(js: example_js) -> float:
     v2 = js.val + 2
     return [v1, v2]
 
+
 # READS n_procs from comm now
 def ms_sl(
     id_list=[0, 50],
@@ -209,6 +210,7 @@ def ms_sl_extra_info(
         "vac_vol_rat_A",
         "vac_vol_rat_B",
     ],
+    print_insertion=False,
 ):
     """
     To use ms_sl properly, write your own run_js_job function along with an
@@ -301,7 +303,10 @@ def ms_sl_extra_info(
                 output_columns=output_columns,
             )
             i2 = time.time() - i1
-            print(f"\nMAIN: id {id_value} inserted\n")
+            insertion_str = ""
+            if print_insertion:
+                insertion_str = f", output={output}"
+            print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nMAIN CLEANING UP PROCESSES\n")
         for n in range(n_procs - 1):
             output = comm.recv(source=MPI.ANY_SOURCE, tag=2)
@@ -324,8 +329,10 @@ def ms_sl_extra_info(
                 output_columns=output_columns,
             )
             comm.send(0, dest=target_proc, tag=2)
+            if print_insertion:
+                insertion_str = f", output={output}"
+            print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nCOMPLETED MAIN\n")
-        # read_output(db_path, id_list=[id_list[0]], id_label=id_label)
 
     else:
         start = True

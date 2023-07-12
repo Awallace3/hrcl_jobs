@@ -19,11 +19,14 @@ from pprint import pprint as pp
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
 
 """
+
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
 
 def create_pt_dict():
     """
@@ -419,7 +422,7 @@ def run_psi4_fsapt(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es_parts = []
     l = level_theory[0]
     mol = psi4.geometry(geom)
@@ -472,7 +475,7 @@ def run_psi4_sapt0(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
 
     for l in level_theory:
@@ -515,7 +518,7 @@ def run_psi4_saptdft(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     # print(geom)
     es = []
 
@@ -633,7 +636,7 @@ def run_psi4_sapt0(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
 
     for l in level_theory:
@@ -779,7 +782,7 @@ def run_psi4_dimer_energy(
     psi4.core.be_quiet()
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A}--\n{B}"
+    geom = f"{A}\n--\n{B}"
     es = []
     mult = constants.conversion_factor("hartree", "kcal / mol")
     for l in level_theory:
@@ -812,46 +815,38 @@ def run_psi4_dimer_energy(
     return es
 
 
-
-
 def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     """
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it
     """
-    psi4.core.be_quiet()
-    ma, mb = [], []
-    for i in js.monAs:
-        ma.append(js.geometry[i, :])
-    for i in js.monBs:
-        mb.append(js.geometry[i, :])
-    ma = tools.np_carts_to_string(ma)
-    mb = tools.np_carts_to_string(mb)
-
     generate_outputs = "out" in js.extra_info.keys()
-
-    A_cm = js.charges[1, :]
-    B_cm = js.charges[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{ma}--\n{B_cm[0]} {B_cm[1]}\n{mb}"
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
     es = []
     for l in js.extra_info["level_theory"]:
-
-        mol = psi4.geometry(geom)
-        psi4.set_memory(js.mem)
-        psi4.set_options(js.extra_info["options"])
         if generate_outputs:
             job_dir = js.extra_info["out"]["path"]
             clean_name = (
-                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+                l.replace("/", "_")
+                .replace("-", "_")
+                .replace("(", "_")
+                .replace(")", "_")
             )
             job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
             os.makedirs(job_dir, exist_ok=True)
             psi4.set_output_file(f"{job_dir}/psi4.out", False)
+        else:
+            psi4.core.be_quiet()
+        if "num_threads" in js.extra_info.keys():
+            psi4.set_num_threads(js.extra_info["num_threads"])
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
 
         e = psi4.energy(f"{l}")
 
         e *= constants.conversion_factor("hartree", "kcal / mol")
-        # print(psi4.core.variables())
-
         ELST = psi4.core.variable("SAPT ELST ENERGY")
         EXCH = psi4.core.variable("SAPT EXCH ENERGY")
         IND = psi4.core.variable("SAPT IND ENERGY")
@@ -863,7 +858,9 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
 
         if generate_outputs:
             with open(f"{job_dir}/psi4_vars.json", "w") as f:
-                json_dump =json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
+                json_dump = json.dumps(
+                    psi4.core.variables(), indent=4, cls=NumpyEncoder
+                )
                 f.write(json_dump)
 
         psi4.core.clean()
@@ -901,7 +898,7 @@ def run_psi4_sapt0_components(
 ) -> []:
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
     for l in level_theory:
         mol = psi4.geometry(geom)
@@ -947,7 +944,7 @@ def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
     ma = tools.np_carts_to_string(ma)
     mb = tools.np_carts_to_string(mb)
     charges = [[0, 1] for i in range(3)]
-    geom = f"{charges[1][0]} {charges[1][1]}\n{ma}"
+    geom = f"{charges[1][0]} {charges[1][1]}\n{ma}\n"
     geom += f"--\n{charges[2][0]} {charges[2][1]}\n{mb}"
 
     out = []
@@ -977,16 +974,8 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
     """
     psi4.core.be_quiet()
-    ma, mb = [], []
-    for i in js.monAs:
-        ma.append(js.geometry[i, :])
-    for i in js.monBs:
-        mb.append(js.geometry[i, :])
-    ma = tools.np_carts_to_string(ma)
-    mb = tools.np_carts_to_string(mb)
     charges = [[0, 1] for i in range(3)]
-    geom = f"{charges[1][0]} {charges[1][1]}\n{ma}"
-    geom += f"--\n{charges[2][0]} {charges[2][1]}\n{mb}"
+    geom = tools.generate_p4input_from_df(js.geometry, charges, js.monAs, js.monBs)
     out = []
     job_dir = js.extra_info["out"]["path"]
     level_theory = js.extra_info["level_theory"]
