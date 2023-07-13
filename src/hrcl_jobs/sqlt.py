@@ -948,3 +948,44 @@ def create_update_table(
         table_add_columns(con, table_name, table_cols)
         print("Skipping Insertions...")
     return True
+
+
+def collect_ids_for_parallel(
+    DB_NAME: str,
+    TABLE_NAME: str,
+    col_check: dict = ["SAPT0_adz", "array"],  # ["name", "type"]
+    sort_column: str = "Geometry",
+    matches: dict = {"SAPT0_adz": "NULL"},
+    id_value: str = "id",
+    ascending: bool = True,
+) -> []:
+    """
+    collect_ids_for_parallel creates column if doesn't exist and matches NULL entries for ID list
+    """
+    con, cur = establish_connection(DB_NAME)
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    id_list = []
+    rank = comm.Get_rank()
+    if rank == 0:
+        create_update_table(
+            DB_NAME,
+            TABLE_NAME,
+            table_cols={col_check[0]: col_check[1]},
+            data={},
+        )
+        query = sqlt_execute(
+            cur,
+            TABLE_NAME,
+            cols=[
+                id_value,
+                sort_column,
+            ],
+            matches=matches,
+        )
+        query = [(i[0], len(i[1])) for i in query]
+        query = sorted(query, key=lambda x: x[1], reverse=ascending)
+        id_list = [i[0] for i in query]
+        print(f"MAIN: {len(id_list)} computations to run")
+    id_list = comm.bcast(id_list, root=0)
+    return id_list
