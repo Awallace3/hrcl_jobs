@@ -9,17 +9,13 @@ import psi4
 from psi4 import oeprop
 from qcelemental import constants
 import json
-
-# from .tools import tools.np_carts_to_string
 from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
 
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
-
 """
-
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -825,21 +821,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     )
     es = []
     for l in js.extra_info["level_theory"]:
-        if generate_outputs:
-            job_dir = js.extra_info["out"]["path"]
-            clean_name = (
-                l.replace("/", "_")
-                .replace("-", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-            )
-            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-            os.makedirs(job_dir, exist_ok=True)
-            psi4.set_output_file(f"{job_dir}/psi4.out", False)
-        else:
-            psi4.core.be_quiet()
-        if "num_threads" in js.extra_info.keys():
-            psi4.set_num_threads(js.extra_info["num_threads"])
         mol = psi4.geometry(geom)
         psi4.set_memory(js.mem)
         psi4.set_options(js.extra_info["options"])
@@ -1014,4 +995,70 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
         print(ie)
         ies = [ie, dimer, monA, monB, cp_correction]
         out.extend(ies)
+    return out
+
+
+def handle_hrcl_extra_info_options(js, l, sub_job=0):
+    generate_outputs = "out" in js.extra_info.keys()
+    if generate_outputs:
+        job_dir = js.extra_info["out"]["path"]
+        clean_name = (
+            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+        )
+        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+        if sub_job != 0:
+            job_dir += f"/{sub_job}"
+        os.makedirs(job_dir, exist_ok=True)
+        psi4.set_output_file(f"{job_dir}/psi4.out", False)
+    else:
+        psi4.core.be_quiet()
+    if "num_threads" in js.extra_info.keys():
+        psi4.set_num_threads(js.extra_info["num_threads"])
+    return
+
+
+def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
+    """
+    mn, out = [], []
+    for i in js.monNs:
+        mn.append(js.geometry[i, :])
+    mn = tools.np_carts_to_string(mn)
+    charges = js.charges[js.extra_info["charge_index"]]
+    geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
+    geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
+    psi4.core.be_quiet()
+    for l in js.extra_info["level_theory"]:
+        # Neutral monomer energy
+        try:
+            sub_job = 1
+            handle_hrcl_extra_info_options(js, l)
+            psi4.geometry(geom_neutral)
+            psi4.set_options(js.extra_info["options"])
+            psi4.set_memory(js.mem)
+            E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
+            occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+                dense=True
+            )
+            HOMO = np.amax(occ_neutral)
+
+            # Cation monomer energy
+            sub_job = 2
+            handle_hrcl_extra_info_options(js, l)
+            psi4.geometry(geom_cation)
+            psi4.set_options(js.extra_info["options"])
+            psi4.set_memory(js.mem)
+            E_cation, wfn_c = psi4.energy(l, return_wfn=True)
+            grac = E_cation - E_neutral + HOMO
+            out.append(E_neutral)
+            out.append(E_cation)
+            out.append(HOMO)
+            out.append(grac)
+            psi4.core.clean()
+        except psi4.SCFConvergenceError:
+            out.append(None)
+            out.append(None)
+            out.append(None)
+            out.append(None)
     return out

@@ -401,6 +401,10 @@ def update_by_id(
         WHERE
             {id_label}=?;
     """
+    for i in output:
+        if i is None:
+            print(f"None in output, skipping {id_value}: {output = }...")
+            return
     cursor.execute(
         cmd,
         (*tuple(output), id_value),

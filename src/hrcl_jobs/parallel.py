@@ -329,6 +329,7 @@ def ms_sl_extra_info(
                 output_columns=output_columns,
             )
             comm.send(0, dest=target_proc, tag=2)
+            insertion_str = ""
             if print_insertion:
                 insertion_str = f", output={output}"
             print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")

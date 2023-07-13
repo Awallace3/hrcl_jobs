@@ -59,7 +59,7 @@ def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
         return out
 
 
-def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+def run_saptdft_grac_shift_qcfi(js: jobspec.saptdft_mon_grac_js):
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
     """
@@ -67,7 +67,6 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
     for i in js.monNs:
         mn.append(js.geometry[i, :])
     mn = tools.np_carts_to_string(mn)
-    print(js)
     shift_n = run_dft_neutral_cation_qca_qcng_error(
         js.client,
         mn,
@@ -134,7 +133,6 @@ def run_dft_neutral_cation_qca_qcng_error(
             try:
                 id1 = int(r1.ids[0])
                 ret1 = client.query_results(id=r1.ids)[0]
-                # pp(ret1.dict())
                 id2 = int(r2.ids[0])
                 orbs = ret1.get_wavefunction("eigenvalues_a").flatten()
                 orbs_b = ret1.get_wavefunction("eigenvalues_b").flatten()
