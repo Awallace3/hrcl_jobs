@@ -821,6 +821,8 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     )
     es = []
     for l in js.extra_info["level_theory"]:
+        handle_hrcl_extra_info_options(js, l)
+
         mol = psi4.geometry(geom)
         psi4.set_memory(js.mem)
         psi4.set_options(js.extra_info["options"])
@@ -838,6 +840,14 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         es.append(out_energies)
 
         if generate_outputs:
+            job_dir = js.extra_info["out"]["path"]
+            clean_name = (
+                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+            )
+            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+            if sub_job != 0:
+                job_dir += f"/{sub_job}"
+                job_dir = js.extra_info["out"]["path"]
             with open(f"{job_dir}/psi4_vars.json", "w") as f:
                 json_dump = json.dumps(
                     psi4.core.variables(), indent=4, cls=NumpyEncoder
@@ -1056,7 +1066,8 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             out.append(HOMO)
             out.append(grac)
             psi4.core.clean()
-        except psi4.SCFConvergenceError:
+        except (psi4.SCFConvergenceError, Exception) as e:
+            print(e)
             out.append(None)
             out.append(None)
             out.append(None)
