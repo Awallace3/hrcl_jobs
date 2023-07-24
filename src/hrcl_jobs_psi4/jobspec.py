@@ -57,6 +57,25 @@ class grimme_js:
     level_theory: [str]
     mem: str
 
+@dataclass
+class sapt0_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str
+
+def sapt0_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "monAs",
+        "monBs",
+        'charges',
+    ]
+
 
 @dataclass
 class saptdft_js:
@@ -86,16 +105,42 @@ class saptdft_mon_grac_js:
     geometry: np.array
     monNs: np.array
     charges: np.array
-    level_theory: [str]
+    extra_info: {}
     mem: str
-
 
 def saptdft_mon_grac_js_headers(monNs="monAs"):
     return [
-        "id_label",
+        "id",
+        "Geometry",
+        f"{monNs}",
+        "charges",
+    ]
+
+def saptdft_mon_grac_js_headers(monNs="monAs"):
+    return [
+        "id",
         "geometry",
         f"{monNs}",
         "charges",
-        "level_theory",
-        "mem",
     ]
+
+@dataclass
+class psi4_dimer_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    extra_info: {}
+    mem: str
+
+
+def psi4_dimer_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "monAs",
+        "monBs",
+    ]
+
+
+

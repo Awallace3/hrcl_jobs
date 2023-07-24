@@ -3,19 +3,25 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from .jobspec import mp_js, grimme_js, saptdft_js, mp_mon_js
+from . import jobspec
 from periodictable import elements
 import psi4
 from psi4 import oeprop
 from qcelemental import constants
-
-# from .tools import np_carts_to_string
-from qm_tools_aw.tools import np_carts_to_string
+import json
+from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
-"""
-/theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
 
 """
+/theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
+"""
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 
 def create_pt_dict():
@@ -87,8 +93,9 @@ def psi4_env_mp(
     """
 
     env_coords *= constants.conversion_factor("angstroms", "bohr")
-    external_potential = np.concatenate([env_charges, env_coords],
-                                        axis=1).reshape((-1, 4))
+    external_potential = np.concatenate([env_charges, env_coords], axis=1).reshape(
+        (-1, 4)
+    )
     psi4.core.be_quiet()
     psi4.set_memory(mem)
     mol = psi4.geometry(mol)
@@ -167,7 +174,8 @@ def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=create_pt_dict()):
 
     mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
-        js.mem, level_theory, mol_d)
+        js.mem, level_theory, mol_d
+    )
     output = [
         vac_multipole_AB,
     ]
@@ -189,7 +197,8 @@ def run_mp_js_job_only_dimer(js: mp_js, el_dc=create_pt_dict()):
     # TODO:  do for dimer together - figure out how to write the mol_AB
     mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
-        js.mem, level_theory, mol_d)
+        js.mem, level_theory, mol_d
+    )
     output = [
         vac_multipole_AB,
         vac_widths_AB,
@@ -203,11 +212,13 @@ def run_mp_mon_js(js: mp_mon_js, el_dc=create_pt_dict()):
     E = np.array([el_dc[i] for i in js.Z])
     mol_A = prep_mol(js.R, js.Z, js.TQ, E)
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
-        js.mem, level_theory, mol_A)
+        js.mem, level_theory, mol_A
+    )
     output = [
         vac_multipole_AB,
     ]
     return output
+
 
 def run_mp_js_job_vac_only(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     """
@@ -220,28 +231,34 @@ def run_mp_js_job_vac_only(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
     # print(f"mol_d: {mol_d}")
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
-        js.mem, level_theory, mol_d)
+        js.mem, level_theory, mol_d
+    )
 
     mol_A = prep_mol(js.RA, js.ZA, js.TQA, EA)
     # print(f"mol_A: {mol_A}")
     vac_multipole_A, charges_A, vac_widths_A, vac_vol_rat_A = psi4_vac_mp(
-        js.mem, level_theory, mol_A)
+        js.mem, level_theory, mol_A
+    )
 
     mol_B = prep_mol(js.RB, js.ZB, js.TQB, EB)
     # print(f"mol_B: {mol_B}")
     vac_multipole_B, charges_B, vac_widths_B, vac_vol_rat_B = psi4_vac_mp(
-        js.mem, level_theory, mol_B)
+        js.mem, level_theory, mol_B
+    )
 
     env_multipole_A, env_widths_A, env_vol_rat_A = psi4_env_mp(
-        js.mem, level_theory, mol_A, js.RB, charges_B)
+        js.mem, level_theory, mol_A, js.RB, charges_B
+    )
     env_multipole_B, env_widths_B, env_vol_rat_B = psi4_env_mp(
-        js.mem, level_theory, mol_B, js.RA, charges_A)
+        js.mem, level_theory, mol_B, js.RA, charges_A
+    )
     output = [
         vac_multipole_A,
         vac_multipole_B,
         vac_multipole_AB,
     ]
     return output
+
 
 def run_mp_js_job(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     """
@@ -254,20 +271,25 @@ def run_mp_js_job(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     # TODO:  do for dimer together - figure out how to write the mol_AB
     mol_d = prep_mol_full(js.RA, js.RB, js.ZA, js.ZB, js.TQA, js.TQB, EA, EB)
     vac_multipole_AB, charges_AB, vac_widths_AB, vac_vol_rat_AB = psi4_vac_mp(
-        js.mem, level_theory, mol_d)
+        js.mem, level_theory, mol_d
+    )
 
     mol_A = prep_mol(js.RA, js.ZA, js.TQA, EA)
     vac_multipole_A, charges_A, vac_widths_A, vac_vol_rat_A = psi4_vac_mp(
-        js.mem, level_theory, mol_A)
+        js.mem, level_theory, mol_A
+    )
 
     mol_B = prep_mol(js.RB, js.ZB, js.TQB, EB)
     vac_multipole_B, charges_B, vac_widths_B, vac_vol_rat_B = psi4_vac_mp(
-        js.mem, level_theory, mol_B)
+        js.mem, level_theory, mol_B
+    )
 
     env_multipole_A, env_widths_A, env_vol_rat_A = psi4_env_mp(
-        js.mem, level_theory, mol_A, js.RB, charges_B)
+        js.mem, level_theory, mol_A, js.RB, charges_B
+    )
     env_multipole_B, env_widths_B, env_vol_rat_B = psi4_env_mp(
-        js.mem, level_theory, mol_B, js.RA, charges_A)
+        js.mem, level_theory, mol_B, js.RA, charges_A
+    )
     output = [
         vac_multipole_A,
         vac_multipole_B,
@@ -316,8 +338,8 @@ def run_mp_js_grimme(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_sapt0(
         ma,
         mb,
@@ -336,13 +358,9 @@ def run_mp_js_grimme_no_cp(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
-    ies = run_psi4_sapt0(ma,
-                         mb,
-                         ppm=js.mem,
-                         level_theory=js.level_theory,
-                         cp=False)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+    ies = run_psi4_sapt0(ma, mb, ppm=js.mem, level_theory=js.level_theory, cp=False)
     return ies
 
 
@@ -355,13 +373,10 @@ def run_mp_js_grimme_fsapt(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
 
-    ies_parts = run_psi4_fsapt(ma,
-                               mb,
-                               ppm=js.mem,
-                               level_theory=js.level_theory)
+    ies_parts = run_psi4_fsapt(ma, mb, ppm=js.mem, level_theory=js.level_theory)
     return ies_parts
 
 
@@ -374,8 +389,8 @@ def run_mp_js_grimme_no_df(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
 
     ies = run_psi4_sapt0(
         # ma, mb, ppm=js.mem, level_theory=js.level_theory, cp=True, scf_type="direct"
@@ -403,19 +418,21 @@ def run_psi4_fsapt(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es_parts = []
     l = level_theory[0]
     mol = psi4.geometry(geom)
     psi4.set_memory(ppm)
-    psi4.set_options({
-        "d_convergence": d_convergence,
-        "freeze_core": "True",
-        "guess": "sad",
-        "scf_type": scf_type,
-        "FISAPT_FSAPT_FILEPATH": "hello",
-        "FISAPT_DO_FSAPT_DISP": True,
-    })
+    psi4.set_options(
+        {
+            "d_convergence": d_convergence,
+            "freeze_core": "True",
+            "guess": "sad",
+            "scf_type": scf_type,
+            "FISAPT_FSAPT_FILEPATH": "hello",
+            "FISAPT_DO_FSAPT_DISP": True,
+        }
+    )
     e, wfn = psi4.energy(l, return_wfn=True)
     print(wfn.matrices())
     """
@@ -454,20 +471,22 @@ def run_psi4_sapt0(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
 
     for l in level_theory:
         mol = psi4.geometry(geom)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "d_convergence": d_convergence,
-            "freeze_core": "True",
-            "guess": "sad",
-            "scf_type": scf_type,
-            # "cholesky_tolerance": 1e-6 # default about 1e-4
-            # check psi4/src/read_options
-        })
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                # "cholesky_tolerance": 1e-6 # default about 1e-4
+                # check psi4/src/read_options
+            }
+        )
         # psi4.core.be_quiet()
         if cp:
             e = psi4.energy(l, bsse_type="cp")
@@ -495,7 +514,7 @@ def run_psi4_saptdft(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     # print(geom)
     es = []
 
@@ -504,13 +523,15 @@ def run_psi4_saptdft(
         # print(m, bs)
         mol = psi4.geometry(geom)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "reference": "rhf",
-            "basis": "aug-cc-pVDZ",
-            "sapt_dft_grac_shift_a": sapt_dft_grac_shift_a,
-            "sapt_dft_grac_shift_b": sapt_dft_grac_shift_b,
-            "SAPT_DFT_FUNCTIONAL": m,
-        })
+        psi4.set_options(
+            {
+                "reference": "rhf",
+                "basis": "aug-cc-pVDZ",
+                "sapt_dft_grac_shift_a": sapt_dft_grac_shift_a,
+                "sapt_dft_grac_shift_b": sapt_dft_grac_shift_b,
+                "SAPT_DFT_FUNCTIONAL": m,
+            }
+        )
         # psi4.core.be_quiet()
         e = psi4.energy("sapt(dft)")
         print(e)
@@ -535,12 +556,11 @@ def run_saptdft(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
-    shift_a = run_dft_neutral_cation(ma,
-                                     charges=js.charges[1],
-                                     ppm=js.mem,
-                                     level_theory=js.level_theory)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+    shift_a = run_dft_neutral_cation(
+        ma, charges=js.charges[1], ppm=js.mem, level_theory=js.level_theory
+    )
     # shift_b = run_dft_neutral_cation(
     #     mb, charges=js.charges[2], ppm=js.mem, level_theory=js.level_theory
     # )
@@ -556,16 +576,17 @@ def run_saptdft(js: saptdft_js) -> np.array:
     # shift_a.extend(ies)
     return shift_a
 
-def run_saptdft_grac_shift(js: saptdft_mon_grac_js):
-    mn = []
-    for i in js.monNs:
-        mn.append(js.geometry[i, :])
-    mn = np_carts_to_string(mn)
-    shift_n = run_dft_neutral_cation(mn,
-                                     charges=js.charges[1],
-                                     ppm=js.mem,
-                                     level_theory=js.level_theory)
-    return shift_n
+
+# def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+#     mn = []
+#     for i in js.monNs:
+#         mn.append(js.geometry[i, :])
+#     mn = tools.np_carts_to_string(mn)
+#     shift_n = run_dft_neutral_cation(mn,
+#                                      charges=js.charges[1],
+#                                      ppm=js.mem,
+#                                      level_theory=js.level_theory)
+#     return shift_n
 
 
 def run_saptdft(js: saptdft_js) -> np.array:
@@ -577,16 +598,14 @@ def run_saptdft(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
-    shift_a = run_dft_neutral_cation(ma,
-                                     charges=js.charges[1],
-                                     ppm=js.mem,
-                                     level_theory=js.level_theory)
-    shift_b = run_dft_neutral_cation(mb,
-                                     charges=js.charges[2],
-                                     ppm=js.mem,
-                                     level_theory=js.level_theory)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+    shift_a = run_dft_neutral_cation(
+        ma, charges=js.charges[1], ppm=js.mem, level_theory=js.level_theory
+    )
+    shift_b = run_dft_neutral_cation(
+        mb, charges=js.charges[2], ppm=js.mem, level_theory=js.level_theory
+    )
     ies = run_psi4_saptdft(
         ma,
         mb,
@@ -613,20 +632,22 @@ def run_psi4_sapt0(
     """ """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
 
     for l in level_theory:
         mol = psi4.geometry(geom)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "d_convergence": d_convergence,
-            "freeze_core": "True",
-            "guess": "sad",
-            "scf_type": scf_type,
-            # "cholesky_tolerance": 1e-6 # default about 1e-4
-            # check psi4/src/read_options
-        })
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                # "cholesky_tolerance": 1e-6 # default about 1e-4
+                # check psi4/src/read_options
+            }
+        )
         # psi4.core.be_quiet()
         if cp:
             e = psi4.energy(l, bsse_type="cp")
@@ -649,17 +670,15 @@ def run_saptdft_no_grac(js: saptdft_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_saptdft(ma, mb, ppm=js.mem, level_theory=js.level_theory)
     return ies
 
 
-def run_dft_neutral_cation(M,
-                           charges,
-                           ppm,
-                           level_theory,
-                           d_convergence="8") -> np.array:
+def run_dft_neutral_cation(
+    M, charges, ppm, level_theory, d_convergence="8"
+) -> np.array:
     """
     run_dft_neutral_cation
     """
@@ -671,13 +690,16 @@ def run_dft_neutral_cation(M,
         m, bs = l.split("/")
         mol = psi4.geometry(geom_neutral)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "reference": "uhf",
-        })
+        psi4.set_options(
+            {
+                "reference": "uhf",
+            }
+        )
         e_neutral, wfn_n = psi4.energy(l, return_wfn=True)
         e_neutral = e_neutral
-        occ_neutral = wfn_n.epsilon_a_subset(basis="SO",
-                                             subset="OCC").to_array(dense=True)
+        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+            dense=True
+        )
         HOMO = np.amax(occ_neutral)
         mol = psi4.geometry(geom_cation)
         e_cation, wfn = psi4.energy(l, return_wfn=True)
@@ -692,11 +714,9 @@ def run_dft_neutral_cation(M,
     return out
 
 
-def run_dft_neutral_cation_qca(M,
-                               charges,
-                               ppm,
-                               level_theory,
-                               d_convergence="8") -> np.array:
+def run_dft_neutral_cation_qca(
+    M, charges, ppm, level_theory, d_convergence="8"
+) -> np.array:
     """
     run_dft_neutral_cation
     """
@@ -708,13 +728,16 @@ def run_dft_neutral_cation_qca(M,
         m, bs = l.split("/")
         mol = psi4.geometry(geom_neutral)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "reference": "uhf",
-        })
+        psi4.set_options(
+            {
+                "reference": "uhf",
+            }
+        )
         e_neutral, wfn_n = psi4.energy(l, return_wfn=True)
         e_neutral = e_neutral
-        occ_neutral = wfn_n.epsilon_a_subset(basis="SO",
-                                             subset="OCC").to_array(dense=True)
+        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+            dense=True
+        )
         HOMO = np.amax(occ_neutral)
         mol = psi4.geometry(geom_cation)
         e_cation, wfn = psi4.energy(l, return_wfn=True)
@@ -755,20 +778,22 @@ def run_psi4_dimer_energy(
     psi4.core.be_quiet()
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A}--\n{B}"
+    geom = f"{A}\n--\n{B}"
     es = []
     mult = constants.conversion_factor("hartree", "kcal / mol")
     for l in level_theory:
         m, bs = l.split("/")
         mol = psi4.geometry(geom)
         psi4.set_memory(ppm)
-        psi4.set_options({
-            "d_convergence": d_convergence,
-            "freeze_core": "True",
-            "guess": "sad",
-            "scf_type": scf_type,
-            "basis": bs,
-        })
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                "basis": bs,
+            }
+        )
         e = psi4.energy(m)
         # e = psi4.energy(m, bsse_type="cp")
         # ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
@@ -785,6 +810,54 @@ def run_psi4_dimer_energy(
         psi4.core.clean()
     return es
 
+
+def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
+    """
+    create_mp_js_grimme turns mp_js object into a psi4 job and runs it
+    """
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    es = []
+    for l in js.extra_info["level_theory"]:
+        handle_hrcl_extra_info_options(js, l)
+
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
+
+        e = psi4.energy(f"{l}")
+
+        e *= constants.conversion_factor("hartree", "kcal / mol")
+        ELST = psi4.core.variable("SAPT ELST ENERGY")
+        EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+        IND = psi4.core.variable("SAPT IND ENERGY")
+        DISP = psi4.core.variable("SAPT DISP ENERGY")
+        ie = sum([ELST, EXCH, IND, DISP])
+        mult = constants.conversion_factor("hartree", "kcal / mol")
+        out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+        es.append(out_energies)
+
+        if generate_outputs:
+            job_dir = js.extra_info["out"]["path"]
+            clean_name = (
+                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+            )
+            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+            if sub_job != 0:
+                job_dir += f"/{sub_job}"
+                job_dir = js.extra_info["out"]["path"]
+            with open(f"{job_dir}/psi4_vars.json", "w") as f:
+                json_dump = json.dumps(
+                    psi4.core.variables(), indent=4, cls=NumpyEncoder
+                )
+                f.write(json_dump)
+
+        psi4.core.clean()
+    return es
+
+
 def run_mp_js_grimme_components(js: grimme_js) -> np.array:
     """
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it
@@ -794,8 +867,8 @@ def run_mp_js_grimme_components(js: grimme_js) -> np.array:
         ma.append(js.geometry[i, :])
     for i in js.monBs:
         mb.append(js.geometry[i, :])
-    ma = np_carts_to_string(ma)
-    mb = np_carts_to_string(mb)
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
     ies = run_psi4_sapt0_components(
         ma,
         mb,
@@ -803,6 +876,7 @@ def run_mp_js_grimme_components(js: grimme_js) -> np.array:
         level_theory=js.level_theory,
     )
     return ies
+
 
 def run_psi4_sapt0_components(
     A: str,
@@ -815,7 +889,7 @@ def run_psi4_sapt0_components(
 ) -> []:
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
-    geom = f"{A_cm[0]} {A_cm[1]}\n{A}--\n{A_cm[0]} {A_cm[1]}\n{B}"
+    geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
     es = []
     for l in level_theory:
         mol = psi4.geometry(geom)
@@ -847,3 +921,155 @@ def run_psi4_sapt0_components(
         es.append(out_energies)
         psi4.core.clean()
     return es
+
+
+def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
+    """
+    ma, mb = [], []
+    for i in js.monAs:
+        ma.append(js.geometry[i, :])
+    for i in js.monBs:
+        mb.append(js.geometry[i, :])
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+    charges = [[0, 1] for i in range(3)]
+    geom = f"{charges[1][0]} {charges[1][1]}\n{ma}\n"
+    geom += f"--\n{charges[2][0]} {charges[2][1]}\n{mb}"
+
+    out = []
+    psi4.core.be_quiet()
+    level_theory = js.extra_info["level_theory"]
+    for l in level_theory:
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
+        if js.extra_info["bsse_type"] == "cp":
+            e = psi4.energy(l, bsse_type="cp")
+            ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        elif js.extra_info["bsse_type"] == "nocp":
+            e = psi4.energy(l, bsse_type="nocp")
+            ie = psi4.core.variable("NOCP-CORRECTED INTERACTION ENERGY")
+        else:
+            print("bsse_type must be cp or nocp")
+            raise ValueError()
+        ie *= constants.conversion_factor("hartree", "kcal / mol")
+        print(ie)
+        out.append(ie)
+    return out
+
+
+def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
+    """
+    psi4.core.be_quiet()
+    charges = [[0, 1] for i in range(3)]
+    geom = tools.generate_p4input_from_df(js.geometry, charges, js.monAs, js.monBs)
+    out = []
+    job_dir = js.extra_info["out"]["path"]
+    level_theory = js.extra_info["level_theory"]
+    for l in level_theory:
+        clean_name = (
+            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+        )
+        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['bsse_type']}{js.extra_info['out']['version']}"
+        os.makedirs(job_dir, exist_ok=True)
+        psi4.set_output_file(f"{job_dir}/psi4.out", False)
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        psi4.set_options(js.extra_info["options"])
+        if js.extra_info["bsse_type"] == "cp":
+            e = psi4.energy(l, bsse_type="cp")
+            vs = psi4.core.variables()
+            ie = vs["CP-CORRECTED INTERACTION ENERGY"]
+            dimer = vs["1_((1, 2), (1, 2))"]
+            monA = vs["1_((1,), (1,))"]
+            monB = vs["1_((2,), (2,))"]
+            cp_correction = vs["CP-CORRECTED INTERACTION ENERGY THROUGH 2-BODY"]
+        elif js.extra_info["bsse_type"] == "nocp":
+            e = psi4.energy(l, bsse_type="nocp")
+            vs = psi4.core.variables()
+            ie = vs["NOCP-CORRECTED INTERACTION ENERGY"]
+            dimer = vs["1_((1, 2), (1, 2))"]
+            monA = vs["1_((1,), (1,))"]
+            monB = vs["1_((2,), (2,))"]
+            cp_correction = vs["NOCP-CORRECTED INTERACTION ENERGY THROUGH 2-BODY"]
+        else:
+            print("bsse_type must be cp or nocp")
+            raise ValueError()
+        with open(f"{job_dir}/psi4_vars.json", "w") as f:
+            f.write(json.dumps(psi4.core.variables(), indent=4))
+        ie *= constants.conversion_factor("hartree", "kcal / mol")
+        print(ie)
+        ies = [ie, dimer, monA, monB, cp_correction]
+        out.extend(ies)
+    return out
+
+
+def handle_hrcl_extra_info_options(js, l, sub_job=0):
+    generate_outputs = "out" in js.extra_info.keys()
+    if generate_outputs:
+        job_dir = js.extra_info["out"]["path"]
+        clean_name = (
+            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+        )
+        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+        if sub_job != 0:
+            job_dir += f"/{sub_job}"
+        os.makedirs(job_dir, exist_ok=True)
+        psi4.set_output_file(f"{job_dir}/psi4.out", False)
+    else:
+        psi4.core.be_quiet()
+    if "num_threads" in js.extra_info.keys():
+        psi4.set_num_threads(js.extra_info["num_threads"])
+    return
+
+
+def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
+    """
+    mn, out = [], []
+    for i in js.monNs:
+        mn.append(js.geometry[i, :])
+    mn = tools.np_carts_to_string(mn)
+    charges = js.charges[js.extra_info["charge_index"]]
+    geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
+    geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
+    psi4.core.be_quiet()
+    for l in js.extra_info["level_theory"]:
+        # Neutral monomer energy
+        try:
+            sub_job = 1
+            handle_hrcl_extra_info_options(js, l)
+            psi4.geometry(geom_neutral)
+            psi4.set_options(js.extra_info["options"])
+            psi4.set_memory(js.mem)
+            E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
+            occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+                dense=True
+            )
+            HOMO = np.amax(occ_neutral)
+
+            # Cation monomer energy
+            sub_job = 2
+            handle_hrcl_extra_info_options(js, l)
+            psi4.geometry(geom_cation)
+            psi4.set_options(js.extra_info["options"])
+            psi4.set_memory(js.mem)
+            E_cation, wfn_c = psi4.energy(l, return_wfn=True)
+            grac = E_cation - E_neutral + HOMO
+            out.append(E_neutral)
+            out.append(E_cation)
+            out.append(HOMO)
+            out.append(grac)
+            psi4.core.clean()
+        except (psi4.SCFConvergenceError, Exception) as e:
+            print(e)
+            out.append(None)
+            out.append(None)
+            out.append(None)
+            out.append(None)
+    return out

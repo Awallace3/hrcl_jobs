@@ -6,22 +6,75 @@ import psi4
 from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
-import qcfractal.interface as qcfi
-
 from . import jobspec
 
 
-def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+def run_psi4_dimer_ie(js: jobspec.psi4_dimer_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "options": options}
+    """
+    ma, mb = [], []
+    for i in js.monAs:
+        ma.append(js.geometry[i, :])
+    for i in js.monBs:
+        mb.append(js.geometry[i, :])
+    ma = tools.np_carts_to_string(ma)
+    mb = tools.np_carts_to_string(mb)
+
+    import qcfractal.interface as qcfi
+
+    kw = qcfi.models.KeywordSet(**{"values": js.extra_info['options']})
+    kw_id = client.add_keywords([kw])[0]
+
+    geom = f"{charges[0]} {charges[1]}\n{M}"
+    geom_in = qcfi.Molecule.from_data(geom)
+    out = []
+    psi4.core.be_quiet()
+    level_theory = js.extra_info["level_theory"]
+    for l in level_theory:
+        m, bs = l.split("/")
+        r1 = client.add_compute(
+            program="psi4",
+            method=l,
+            basis=bs,
+            driver="energy",
+            molecule=[geom_in],
+            keywords=kw_id,
+            protocols={"bsse_type": js.extra_info['bsse_type']},
+        )
+        try:
+            id1 = int(r1.ids[0])
+            ret1 = client.query_results(id=r1.ids)[0]
+            result1 = ret1.dict()
+            if js.extra_info['bsse_type'] == "cp":
+                ie = result1["extras"]["qcvars"]["CP-CORRECTED INTERACTION ENERGY"]
+            elif js.extra_info['bsse_type'] == "nocp":
+                ie = result1["extras"]["qcvars"]["NOCP-CORRECTED INTERACTION ENERGY"]
+            else:
+                print("bsse_type not recognized")
+                raise ValueError
+            out.append(ie)
+        except (AttributeError, TypeError):
+            out.append(None)
+        return out
+
+
+def run_saptdft_grac_shift_qcfi(js: jobspec.saptdft_mon_grac_js):
+    """
+    xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
+    """
     mn = []
     for i in js.monNs:
         mn.append(js.geometry[i, :])
-    mn = np_carts_to_string(mn)
+    mn = tools.np_carts_to_string(mn)
     shift_n = run_dft_neutral_cation_qca_qcng_error(
         js.client,
         mn,
-        charges=js.charges[1],
+        charges=js.charges[js.extra_info["charge_index"]],
         ppm=js.mem,
-        level_theory=js.level_theory,
+        id_label=js.id_label,
+        level_theory=js.extra_info["level_theory"],
+        mon=js.extra_info["charge_index"],
     )
     return shift_n
 
@@ -34,8 +87,7 @@ def run_dft_neutral_cation_qca_qcng_error(
     id_label,
     level_theory,
     mon,
-    d_convergence="8",
-    gather_results=False,
+    gather_results=True,
     print_file=False,
     options={"reference": "uhf"},
 ) -> np.array:
@@ -81,7 +133,6 @@ def run_dft_neutral_cation_qca_qcng_error(
             try:
                 id1 = int(r1.ids[0])
                 ret1 = client.query_results(id=r1.ids)[0]
-                # pp(ret1.dict())
                 id2 = int(r2.ids[0])
                 orbs = ret1.get_wavefunction("eigenvalues_a").flatten()
                 orbs_b = ret1.get_wavefunction("eigenvalues_b").flatten()
@@ -207,8 +258,7 @@ def run_saptdft_with_grads(
     charges,
     ppm,
     level_theory,
-    d_convergence="8",
-    gather_results=False,
+    gather_results=True,
     sapt_dft_grac_shift_a: float = 1e-16,
     sapt_dft_grac_shift_b: float = 1e-16,
     print_file: bool = True,
@@ -317,7 +367,7 @@ def run_saptdft_with_grads(
         return out
 
 
-def run_saptdft_qcng(js: saptdft_js) -> np.array:
+def run_saptdft_qcng(js: jobspec.saptdft_js) -> np.array:
     """
     run_saptdft computes scaling factor and uses to run SAPT-DFT
     """

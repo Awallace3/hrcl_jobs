@@ -24,6 +24,7 @@ def example_run_js_job(js: example_js) -> float:
     v2 = js.val + 2
     return [v1, v2]
 
+
 # READS n_procs from comm now
 def ms_sl(
     id_list=[0, 50],
@@ -193,15 +194,13 @@ def ms_sl(
 def ms_sl_extra_info(
     id_list=[0, 50],
     db_path="db/dimers_all.db",
-    collect_ids_into_js_ls=collect_ids_into_js_ls,
-    collect_id_into_js=collect_id_into_js,
     run_js_job=example_run_js_job,
     update_func=update_by_id,
     extra_info=[],
     headers_sql=["main_id", "id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
     js_obj=example_js,
     ppm="4gb",
-    table="main",
+    table_name="main",
     id_label="id",
     output_columns=[
         "env_multipole_A",
@@ -211,6 +210,7 @@ def ms_sl_extra_info(
         "vac_vol_rat_A",
         "vac_vol_rat_B",
     ],
+    print_insertion=False,
 ):
     """
     To use ms_sl properly, write your own run_js_job function along with an
@@ -239,26 +239,26 @@ def ms_sl_extra_info(
         if len(id_list) == 1 or n_procs == 2:
             js = collect_id_into_js(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_value=id_list[0],
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                id_list[0],
+                id_label,
+                table_name,
             )
             r = [js]
 
         else:
             r = collect_ids_into_js_ls(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_list=id_list_first,
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                id_list_first,
+                id_label,
+                table_name,
             )
         for n, js in enumerate(r):
             n = n + 1
@@ -275,13 +275,13 @@ def ms_sl_extra_info(
             id_value = output.pop()
             js = collect_id_into_js(
                 cur,
-                mem=ppm,
-                headers=headers_sql,
-                extra_info=extra_info,
-                dataclass_obj=js_obj,
-                id_value=active_ind,
-                id_label=id_label,
-                table=table,
+                headers_sql,
+                ppm,
+                extra_info,
+                js_obj,
+                active_ind,
+                id_label,
+                table_name,
             )
             comm.send(js, dest=target_proc, tag=2)
             i1 = time.time()
@@ -297,13 +297,16 @@ def ms_sl_extra_info(
                 con,
                 cur,
                 output,
-                id_label=id_label,
                 id_value=id_value,
-                table=table,
+                id_label=id_label,
+                table=table_name,
                 output_columns=output_columns,
             )
             i2 = time.time() - i1
-            print(f"\nMAIN: id {id_value} inserted\n")
+            insertion_str = ""
+            if print_insertion:
+                insertion_str = f", output={output}"
+            print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nMAIN CLEANING UP PROCESSES\n")
         for n in range(n_procs - 1):
             output = comm.recv(source=MPI.ANY_SOURCE, tag=2)
@@ -322,12 +325,15 @@ def ms_sl_extra_info(
                 output,
                 id_label=id_label,
                 id_value=id_value,
-                table=table,
+                table=table_name,
                 output_columns=output_columns,
             )
             comm.send(0, dest=target_proc, tag=2)
+            insertion_str = ""
+            if print_insertion:
+                insertion_str = f", output={output}"
+            print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nCOMPLETED MAIN\n")
-        # read_output(db_path, id_list=[id_list[0]], id_label=id_label)
 
     else:
         start = True
@@ -351,6 +357,6 @@ def ms_sl_extra_info(
                 output.append(js.id_label)
                 output.append(rank)
                 comm.send(output, dest=0, tag=2)
-                print(f"rank: {rank} TOOK {time.time() - s} seconds")
+                print(f"rank: {rank} spent {time.time() - s} seconds on {js.id_label}")
         print(rank, "TERMINATING")
         return

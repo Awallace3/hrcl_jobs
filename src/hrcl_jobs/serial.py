@@ -117,7 +117,7 @@ def job_runner(
             dataclass_obj=js_obj,
             id_value=active_ind,
             id_label=id_label,
-            table=table,
+            table=table_name,
         )
         output = run_js_job(js)
         update_func(
@@ -150,8 +150,6 @@ def job_runner_qcf(
     ],
     client_url="localhost:7778",
     # The user does not need to change the following unless desired
-    collect_id_into_js=collect_id_into_js,
-    update_func=update_by_id,
 ):
     from qcfractal.interface import FractalClient
     from qcfractal import FractalServer
@@ -161,25 +159,25 @@ def job_runner_qcf(
     first = True
     con, cur = establish_connection(db_p=db_path)
     for n, active_ind in enumerate(id_list):
-        js = sqlt.collect_id_into_js_qca(
+        js = sqlt.collect_id_into_js(
             cur,
-            client=client,
-            mem=ppm,
-            headers=headers_sql,
-            extra_info=level_theory,
-            dataclass_obj=js_obj,
-            id_value=active_ind,
-            id_label=id_label,
-            table=table,
+            headers_sql,
+            ppm,
+            extra_info,
+            js_obj,
+            active_ind,
+            id_label,
+            table_name,
+            client,
         )
         output = run_js_job(js)
-        update_func(
+        update_by_id(
             con,
             cur,
             output,
             id_label=id_label,
             id_value=active_ind,
-            table=table,
+            table=table_name,
             output_columns=output_columns,
         )
     print((time.time() - start) / 60, "Minutes")

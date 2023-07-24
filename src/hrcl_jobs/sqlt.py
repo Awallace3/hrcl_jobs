@@ -224,6 +224,19 @@ def subset_df(index_split=range(10000, 10050)):
     return
 
 
+def update_column_value(con, cur, table_name, column_name, value):
+    """
+    update_column_value
+    """
+    try:
+        cur.execute(f"UPDATE {table_name} SET {column_name} = {value}")
+        con.commit()
+    except e:
+        print(e)
+        return False
+    return True
+
+
 def convert_df_into_sql(
     df_p="df.pkl",
     db_p="db/sql.db",
@@ -270,20 +283,27 @@ def convert_df_into_sql(
         elif v.lower() == "integer primary key":
             df[k] = [i for i in range(len(df))]
         else:
-            raise TypeError()
+            print(f"Ensure that {v} is a valid SQL type.")
+            df[k] = [None for i in range(len(df))]
         input_columns[k] = v
     df = df[[i for i in input_columns.keys()]]
     # print(input_columns)
     print(df.columns)
     print(df)
     print("built df...")
+    table_name = "main"
     df.to_sql(
-        "main",
+        table_name,
         con,
         if_exists="replace",
         index=False,
         dtype=input_columns,
     )
+    print("built sql...")
+    for k, v in output_columns.items():
+        if v.lower() == "array":
+            print(v)
+            update_column_value(con, cur, table_name, k, "NULL")
     return
 
 
@@ -381,6 +401,10 @@ def update_by_id(
         WHERE
             {id_label}=?;
     """
+    for i in output:
+        if i is None:
+            print(f"None in output, skipping {id_value}: {output = }...")
+            return
     cursor.execute(
         cmd,
         (*tuple(output), id_value),
@@ -486,7 +510,7 @@ def collect_id_into_js(
     id_value: int = 0,
     id_label: str = "main_id",
     table="main",
-    # *args,
+    *args,
 ) -> []:
     """
     collect_rows collects a range of rows for a table with requested headers.
@@ -497,17 +521,12 @@ def collect_id_into_js(
 """
     cursor.execute(sql_cmd)
     v = cursor.fetchone()
-    js = dataclass_obj(
-        *v,
-        extra_info,
-        mem=mem,
-        # *args,
-    )
     try:
         js = dataclass_obj(
             *v,
             extra_info,
             mem=mem,
+            *args,
         )
     except TypeError as e:
         print(e)
@@ -913,17 +932,17 @@ def create_update_table(
 
     table_exists = new_table(db_path, table_name, table_cols)
     con, cur = establish_connection(db_path)
-    insertion, vals = [], []
-    v_len = len(data[list(data.keys())[0]])
-    for k, v in data.items():
-        insertion.append(k)
-        vals.append(v)
-        if len(v) != v_len:
-            print("ERROR: data length mismatch", k, len(v), v_len)
-            return False
-
-    vals = tuple(vals)
     if table_exists:
+        insertion, vals = [], []
+        v_len = len(data[list(data.keys())[0]])
+        for k, v in data.items():
+            insertion.append(k)
+            vals.append(v)
+            if len(v) != v_len:
+                print("ERROR: data length mismatch", k, len(v), v_len)
+                return False
+
+        vals = tuple(vals)
         cnt = 0
         for r in zip(*vals):
             insert_new_row(cur, con, table_name, insertion, r)
@@ -933,3 +952,44 @@ def create_update_table(
         table_add_columns(con, table_name, table_cols)
         print("Skipping Insertions...")
     return True
+
+
+def collect_ids_for_parallel(
+    DB_NAME: str,
+    TABLE_NAME: str,
+    col_check: dict = ["SAPT0_adz", "array"],  # ["name", "type"]
+    sort_column: str = "Geometry",
+    matches: dict = {"SAPT0_adz": "NULL"},
+    id_value: str = "id",
+    ascending: bool = True,
+) -> []:
+    """
+    collect_ids_for_parallel creates column if doesn't exist and matches NULL entries for ID list
+    """
+    con, cur = establish_connection(DB_NAME)
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    id_list = []
+    rank = comm.Get_rank()
+    if rank == 0:
+        create_update_table(
+            DB_NAME,
+            TABLE_NAME,
+            table_cols={col_check[0]: col_check[1]},
+            data={},
+        )
+        query = sqlt_execute(
+            cur,
+            TABLE_NAME,
+            cols=[
+                id_value,
+                sort_column,
+            ],
+            matches=matches,
+        )
+        query = [(i[0], len(i[1])) for i in query]
+        query = sorted(query, key=lambda x: x[1], reverse=ascending)
+        id_list = [i[0] for i in query]
+        print(f"MAIN: {len(id_list)} computations to run")
+    id_list = comm.bcast(id_list, root=0)
+    return id_list
