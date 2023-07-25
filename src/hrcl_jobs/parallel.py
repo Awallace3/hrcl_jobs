@@ -191,6 +191,24 @@ def ms_sl(
         return
 
 
+class machineResources:
+    def __init__(
+        self,
+        name: str,
+        cores: int,
+        threads: int,
+        memory: int,
+        memory_per_core="4 gb",
+        omp_threads: int = 2,
+    ):  # GB
+        self.name = name
+        self.cores = cores
+        self.threads = threads
+        self.memory = memory  # Total Memory
+        self.memory_per_thread = memory_per_core
+        self.omp_threads = omp_threads
+
+
 def ms_sl_extra_info(
     id_list=[0, 50],
     db_path="db/dimers_all.db",
@@ -342,6 +360,8 @@ def ms_sl_extra_info(
         js = req.wait()
         print(f"rank: {rank}, js.main_id: {js.id_label}")
         s = time.time()
+        js.ppm = ppm
+        js.extra_info = extra_info
         output = run_js_job(js)
         output.append(js.id_label)
         output.append(rank)
@@ -353,6 +373,8 @@ def ms_sl_extra_info(
             js = comm.recv(source=0, tag=2)
             if js != 0:
                 print(f"rank: {rank}, js.main_id: {js.id_label}")
+                js.ppm = ppm
+                js.extra_info = extra_info
                 output = run_js_job(js)
                 output.append(js.id_label)
                 output.append(rank)

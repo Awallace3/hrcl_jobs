@@ -845,9 +845,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
                 l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
             )
             job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-            if sub_job != 0:
-                job_dir += f"/{sub_job}"
-                job_dir = js.extra_info["out"]["path"]
             with open(f"{job_dir}/psi4_vars.json", "w") as f:
                 json_dump = json.dumps(
                     psi4.core.variables(), indent=4, cls=NumpyEncoder
@@ -1043,7 +1040,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
         # Neutral monomer energy
         try:
             sub_job = 1
-            handle_hrcl_extra_info_options(js, l)
+            handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_neutral)
             psi4.set_options(js.extra_info["options"])
             psi4.set_memory(js.mem)
@@ -1055,7 +1052,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
 
             # Cation monomer energy
             sub_job = 2
-            handle_hrcl_extra_info_options(js, l)
+            handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_cation)
             psi4.set_options(js.extra_info["options"])
             psi4.set_memory(js.mem)

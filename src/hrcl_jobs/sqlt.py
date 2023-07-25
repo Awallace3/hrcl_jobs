@@ -969,8 +969,8 @@ def collect_ids_for_parallel(
     con, cur = establish_connection(DB_NAME)
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
-    id_list = []
     rank = comm.Get_rank()
+    id_list = []
     if rank == 0:
         create_update_table(
             DB_NAME,
