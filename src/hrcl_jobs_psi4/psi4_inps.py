@@ -823,6 +823,8 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     for l in js.extra_info["level_theory"]:
         handle_hrcl_extra_info_options(js, l)
 
+        # psi4.core.IOManager.shared_object().set_default_path(os.path.abspath(os.path.expanduser(args["scratch"])))
+        # concatenate HASH with PID
         mol = psi4.geometry(geom)
         psi4.set_memory(js.mem)
         psi4.set_options(js.extra_info["options"])
@@ -973,7 +975,8 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
         )
         job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['bsse_type']}{js.extra_info['out']['version']}"
         os.makedirs(job_dir, exist_ok=True)
-        psi4.set_output_file(f"{job_dir}/psi4.out", False)
+        psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
+        # psi4.print_out("")
         mol = psi4.geometry(geom)
         psi4.set_memory(js.mem)
         psi4.set_options(js.extra_info["options"])
@@ -1007,6 +1010,11 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
 
 def handle_hrcl_extra_info_options(js, l, sub_job=0):
     generate_outputs = "out" in js.extra_info.keys()
+    set_scratch = "scratch" in js.extra_info.keys()
+    if set_scratch:
+        psi4.core.IOManager.shared_object().set_default_path(
+            os.path.abspath(os.path.expanduser(js.extra_info["scratch"]['path']))
+        )
     if generate_outputs:
         job_dir = js.extra_info["out"]["path"]
         clean_name = (
@@ -1016,7 +1024,8 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         if sub_job != 0:
             job_dir += f"/{sub_job}"
         os.makedirs(job_dir, exist_ok=True)
-        psi4.set_output_file(f"{job_dir}/psi4.out", False)
+        psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
+        psi4.print_out(f"{js}")
     else:
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
