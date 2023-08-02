@@ -1025,7 +1025,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
             job_dir += f"/{sub_job}"
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
-        psi4.print_out(f"{js}")
+        psi4.core.print_out(f"{js}")
     else:
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
