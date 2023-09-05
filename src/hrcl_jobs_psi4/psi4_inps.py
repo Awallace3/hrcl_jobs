@@ -17,6 +17,7 @@ from pprint import pprint as pp
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
 """
 
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -499,6 +500,7 @@ def run_psi4_sapt0(
         psi4.core.clean()
     return es
 
+
 def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
@@ -508,10 +510,8 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
     for l in js.extra_info["level_theory"]:
         handle_hrcl_extra_info_options(js, l)
         mol = psi4.geometry(geom)
-        psi4.set_memory(js.mem)
-        js.extra_info['options']['sapt_dft_grac_shift_a'] = js.grac_shift_a
-        js.extra_info['options']['sapt_dft_grac_shift_b'] = js.grac_shift_b
-        psi4.set_options(js.extra_info["options"])
+        js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
+        js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
 
         e = psi4.energy(f"{l}")
 
@@ -525,21 +525,8 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
         es.append(out_energies)
 
-        if generate_outputs:
-            job_dir = js.extra_info["out"]["path"]
-            clean_name = (
-                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
-            )
-            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-            with open(f"{job_dir}/psi4_vars.json", "w") as f:
-                json_dump = json.dumps(
-                    psi4.core.variables(), indent=4, cls=NumpyEncoder
-                )
-                f.write(json_dump)
-
-        psi4.core.clean()
+        handle_hrcl_psi4_cleanup(js, l)
     return es
-
 
 
 def run_psi4_saptdft(
@@ -868,9 +855,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         # psi4.core.IOManager.shared_object().set_default_path(os.path.abspath(os.path.expanduser(args["scratch"])))
         # concatenate HASH with PID
         mol = psi4.geometry(geom)
-        psi4.set_memory(js.mem)
-        psi4.set_options(js.extra_info["options"])
-
         e = psi4.energy(f"{l}")
 
         e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -884,17 +868,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         es.append(out_energies)
 
         if generate_outputs:
-            job_dir = js.extra_info["out"]["path"]
-            clean_name = (
-                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
-            )
-            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-            with open(f"{job_dir}/psi4_vars.json", "w") as f:
-                json_dump = json.dumps(
-                    psi4.core.variables(), indent=4, cls=NumpyEncoder
-                )
-                f.write(json_dump)
-
         psi4.core.clean()
     return es
 
@@ -1051,11 +1024,13 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
 
 
 def handle_hrcl_extra_info_options(js, l, sub_job=0):
+    psi4.set_memory(js.mem)
+    psi4.set_options(js.extra_info["options"])
     generate_outputs = "out" in js.extra_info.keys()
     set_scratch = "scratch" in js.extra_info.keys()
     if set_scratch:
         psi4.core.IOManager.shared_object().set_default_path(
-            os.path.abspath(os.path.expanduser(js.extra_info["scratch"]['path']))
+            os.path.abspath(os.path.expanduser(js.extra_info["scratch"]["path"]))
         )
     if generate_outputs:
         job_dir = js.extra_info["out"]["path"]
@@ -1072,6 +1047,24 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
         psi4.set_num_threads(js.extra_info["num_threads"])
+    return
+
+def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
+    generate_outputs = "out" in js.extra_info.keys()
+    if generate_outputs:
+        job_dir = js.extra_info["out"]["path"]
+        clean_name = (
+            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+        )
+        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+        if sub_job != 0:
+            job_dir += f"/{sub_job}"
+        with open(f"{job_dir}/psi4_vars.json", "w") as f:
+            json_dump = json.dumps(
+                psi4.core.variables(), indent=4, cls=NumpyEncoder
+            )
+            f.write(json_dump)
+    psi4.core.clean()
     return
 
 
@@ -1093,8 +1086,6 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             sub_job = 1
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_neutral)
-            psi4.set_options(js.extra_info["options"])
-            psi4.set_memory(js.mem)
             E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
             occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
                 dense=True
@@ -1105,8 +1096,6 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             sub_job = 2
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_cation)
-            psi4.set_options(js.extra_info["options"])
-            psi4.set_memory(js.mem)
             E_cation, wfn_c = psi4.energy(l, return_wfn=True)
             grac = E_cation - E_neutral + HOMO
             out.append(E_neutral)
