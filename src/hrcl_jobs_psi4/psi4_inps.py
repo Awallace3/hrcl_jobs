@@ -508,10 +508,10 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
     )
     es = []
     for l in js.extra_info["level_theory"]:
-        handle_hrcl_extra_info_options(js, l)
         mol = psi4.geometry(geom)
         js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
+        handle_hrcl_extra_info_options(js, l)
 
         e = psi4.energy(f"{l}")
 
