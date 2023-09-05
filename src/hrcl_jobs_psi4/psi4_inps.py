@@ -866,9 +866,8 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         mult = constants.conversion_factor("hartree", "kcal / mol")
         out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
         es.append(out_energies)
+        handle_hrcl_psi4_cleanup(js, l)
 
-        if generate_outputs:
-        psi4.core.clean()
     return es
 
 
