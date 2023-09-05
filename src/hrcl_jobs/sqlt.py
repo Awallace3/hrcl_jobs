@@ -261,11 +261,17 @@ def convert_df_into_sql(
         "HF_tz": "FLOAT",
         "main_id": "INTEGER PRIMARY KEY",
     },
+    table_name="main",
+    overwrite=False,
 ) -> None:
     """
     convert_df_into_sql builds db from pd.DataFrame
     """
+    if os.path.exists(db_p) and not overwrite:
+        print(f"{db_p} already exists!")
+        return
     con, cur = establish_connection(db_p=db_p)
+
     df = pd.read_pickle(df_p)
     # df = df[df['DB'] == "S22by7"]
     # df = df.drop_duplicates(subset="System #", inplace=False)
@@ -291,7 +297,6 @@ def convert_df_into_sql(
     print(df.columns)
     print(df)
     print("built df...")
-    table_name = "main"
     df.to_sql(
         table_name,
         con,
@@ -588,6 +593,8 @@ def sqlt_execute(
             if len(v) == 1:
                 if v[0] == '"NULL"':
                     m = f"{k} IS NULL"
+                elif v[0] == '"NOT NULL"':
+                    m = f"{k} IS NOT NULL"
                 elif type(v[0]) == str and "!" in v[0]:
                     # m = f"{k}!='{v[0][1:-1]}'"
                     m = f"{k} NOT LIKE '{v[0][2:-1]}'"
@@ -601,6 +608,7 @@ def sqlt_execute(
         sql_cmd = f"""{action} {cols} FROM {table_name} {extra_action} {wm};"""
     else:
         sql_cmd = f"""{action} {cols} FROM {table_name};"""
+    print(sql_cmd)
     cur.execute(sql_cmd)
     val_list = [i for i in cur.fetchall()]
     for i in range(len(val_list)):
@@ -968,6 +976,7 @@ def collect_ids_for_parallel(
     """
     con, cur = establish_connection(DB_NAME)
     from mpi4py import MPI
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     id_list = []
@@ -993,3 +1002,57 @@ def collect_ids_for_parallel(
         print(f"MAIN: {len(id_list)} computations to run")
     id_list = comm.bcast(id_list, root=0)
     return id_list
+
+
+def merge_db_cols(
+    db1={
+        "db_path": "db/schr.db",
+        "table_name": "main",
+    },
+    db2={
+        "db_path": "db/schr_HIVE.db",
+        "table_name": "main",
+        "col_names": [
+            "SAPT0_jtz",
+            # "SAPT0_atz",
+        ],
+    },
+    overwrite=True,
+):
+    con1, cur1 = establish_connection(db1["db_path"])
+    con2, cur2 = establish_connection(db2["db_path"])
+    for i in db2["col_names"]:
+        print(i)
+        q1 = sqlt_execute(
+            cur1,
+            db1["table_name"],
+            cols=[
+                "id",
+            ],
+            matches={
+                i: ["NOT NULL"],
+            },
+        )
+        print(q1)
+        if overwrite or len(q1) == 0:
+            print("Updating...")
+            q2 = sqlt_execute(
+                cur2,
+                db2["table_name"],
+                cols=[
+                    "id",
+                    i,
+                ],
+                matches={
+                    i: ["NOT NULL"],
+                },
+            )
+            update = []
+            for j in q2:
+                update.append({"id": j[0], "value": j[1]})
+            sql_cmd = f"UPDATE {db1['table_name']} SET {i}=:value WHERE rowId=:id"
+            print(sql_cmd)
+            con1.executemany(sql_cmd, update)
+            print(list(con1.execute(f"select {i} from {db1['table_name']}")))
+            con1.commit()
+    return

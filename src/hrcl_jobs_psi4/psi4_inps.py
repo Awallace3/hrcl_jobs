@@ -499,6 +499,48 @@ def run_psi4_sapt0(
         psi4.core.clean()
     return es
 
+def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    es = []
+    for l in js.extra_info["level_theory"]:
+        handle_hrcl_extra_info_options(js, l)
+        mol = psi4.geometry(geom)
+        psi4.set_memory(js.mem)
+        js.extra_info['options']['sapt_dft_grac_shift_a'] = js.grac_shift_a
+        js.extra_info['options']['sapt_dft_grac_shift_b'] = js.grac_shift_b
+        psi4.set_options(js.extra_info["options"])
+
+        e = psi4.energy(f"{l}")
+
+        e *= constants.conversion_factor("hartree", "kcal / mol")
+        ie = psi4.core.variable("SAPT(DFT) TOTAL ENERGY")
+        ELST = psi4.core.variable("SAPT ELST ENERGY")
+        EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+        IND = psi4.core.variable("SAPT IND ENERGY")
+        DISP = psi4.core.variable("SAPT DISP ENERGY")
+        mult = constants.conversion_factor("hartree", "kcal / mol")
+        out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+        es.append(out_energies)
+
+        if generate_outputs:
+            job_dir = js.extra_info["out"]["path"]
+            clean_name = (
+                l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+            )
+            job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+            with open(f"{job_dir}/psi4_vars.json", "w") as f:
+                json_dump = json.dumps(
+                    psi4.core.variables(), indent=4, cls=NumpyEncoder
+                )
+                f.write(json_dump)
+
+        psi4.core.clean()
+    return es
+
+
 
 def run_psi4_saptdft(
     A: str,
