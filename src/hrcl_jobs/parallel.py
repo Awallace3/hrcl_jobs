@@ -360,8 +360,8 @@ def ms_sl_extra_info(
         js = req.wait()
         print(f"rank: {rank}, js.main_id: {js.id_label}")
         s = time.time()
-        js.ppm = ppm
         js.extra_info = extra_info
+        js.mem = ppm
         output = run_js_job(js)
         output.append(js.id_label)
         output.append(rank)
@@ -373,8 +373,8 @@ def ms_sl_extra_info(
             js = comm.recv(source=0, tag=2)
             if js != 0:
                 print(f"rank: {rank}, js.main_id: {js.id_label}")
-                js.ppm = ppm
                 js.extra_info = extra_info
+                js.mem = ppm
                 output = run_js_job(js)
                 output.append(js.id_label)
                 output.append(rank)
