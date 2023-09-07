@@ -1064,6 +1064,9 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
             )
             f.write(json_dump)
     psi4.core.clean()
+    psi4.core.clean_options()
+    psi4.core.clean_variables()
+    psi4.core.clean_timers()
     return
 
 
@@ -1078,7 +1081,6 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
     charges = js.charges[js.extra_info["charge_index"]]
     geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
     geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
-    psi4.core.be_quiet()
     for l in js.extra_info["level_theory"]:
         # Neutral monomer energy
         try:
@@ -1090,6 +1092,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
                 dense=True
             )
             HOMO = np.amax(occ_neutral)
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
 
             # Cation monomer energy
             sub_job = 2
@@ -1101,11 +1104,12 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             out.append(E_cation)
             out.append(HOMO)
             out.append(grac)
-            psi4.core.clean()
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
         except (psi4.SCFConvergenceError, Exception) as e:
-            print(e)
             out.append(None)
             out.append(None)
             out.append(None)
             out.append(None)
+            print(e, "\n\nCONTINUING")
+    psi4.core.clean()
     return out
