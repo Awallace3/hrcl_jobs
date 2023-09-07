@@ -1000,8 +1000,6 @@ def collect_ids_for_parallel(
         query = sorted(query, key=lambda x: x[1], reverse=ascending)
         id_list = [i[0] for i in query]
         print(f"MAIN: {len(id_list)} computations to run")
-    else:
-        print(f"{rank = } waiting main...")
     id_list = comm.bcast(id_list, root=0)
     return id_list
 
