@@ -1063,6 +1063,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
                 psi4.core.variables(), indent=4, cls=NumpyEncoder
             )
             f.write(json_dump)
+
     psi4.core.clean()
     psi4.core.clean_options()
     psi4.core.clean_variables()
@@ -1110,6 +1111,6 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             out.append(None)
             out.append(None)
             out.append(None)
-            print(e, "\n\nCONTINUING")
-    psi4.core.clean()
+            print(e)
+            handle_hrcl_psi4_cleanup(js, l, 1)
     return out
