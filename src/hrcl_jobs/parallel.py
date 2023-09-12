@@ -286,7 +286,6 @@ def ms_sl_extra_info(
             print(f"{n} / {jobs}")
 
         diff = len(r) - (n_procs - 1)
-        print(f"{diff = }, {n_procs = } {len(r) = }")
         if diff < 0:
             print(
                 f"WARNING: n_procs ({n_procs}) > len(id_list) ({len(id_list)}), reducing n_procs to {len(r) + 1}"
