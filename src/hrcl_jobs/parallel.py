@@ -278,11 +278,24 @@ def ms_sl_extra_info(
                 id_label,
                 table_name,
             )
+
         for n, js in enumerate(r):
             n = n + 1
             req = comm.isend(js, dest=n, tag=2)
             req.wait()
             print(f"{n} / {jobs}")
+
+        diff = len(r) - (n_procs - 1)
+        print(f"{diff = }, {n_procs = } {len(r) = }")
+        if diff < 0:
+            print(
+                f"WARNING: n_procs ({n_procs}) > len(id_list) ({len(id_list)}), reducing n_procs to {len(r) + 1}"
+            )
+            for n in range(len(r) + 1, n_procs):
+                req = comm.isend(0, dest=n, tag=2)
+                req.wait()
+            n_procs = len(r) + 1
+
 
         id_list_extra = id_list[len(r) :]
         # active_ind = jobs + n_procs - 1
@@ -354,10 +367,12 @@ def ms_sl_extra_info(
         print("\nCOMPLETED MAIN\n")
 
     else:
-        start = True
         js = 1
         req = comm.irecv(source=0, tag=2)
         js = req.wait()
+        if js == 0:
+            print(f"rank: {rank} TERMINATING")
+            return
         print(f"rank: {rank}, js.main_id: {js.id_label}")
         s = time.time()
         js.extra_info = extra_info

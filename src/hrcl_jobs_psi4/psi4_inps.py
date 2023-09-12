@@ -1073,7 +1073,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
     return
 
 
-def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
+def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
     """
@@ -1103,6 +1103,11 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
             psi4.geometry(geom_cation)
             E_cation, wfn_c = psi4.energy(l, return_wfn=True)
             grac = E_cation - E_neutral + HOMO
+            if grac >= 1 or grac <= 0:
+                print(f"{grac = }")
+                raise Exception("Grac appears wrong. Not inserting into DB.")
+            if print_level < 3:
+                print(f"{E_cation = } {E_neutral = } {HOMO = } {grac = }")
             out.append(E_neutral)
             out.append(E_cation)
             out.append(HOMO)
