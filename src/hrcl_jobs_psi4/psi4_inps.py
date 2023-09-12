@@ -513,18 +513,20 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
         handle_hrcl_extra_info_options(js, l)
 
-        e = psi4.energy(f"{l}")
-
-        e *= constants.conversion_factor("hartree", "kcal / mol")
-        ie = psi4.core.variable("SAPT(DFT) TOTAL ENERGY")
-        ELST = psi4.core.variable("SAPT ELST ENERGY")
-        EXCH = psi4.core.variable("SAPT EXCH ENERGY")
-        IND = psi4.core.variable("SAPT IND ENERGY")
-        DISP = psi4.core.variable("SAPT DISP ENERGY")
-        mult = constants.conversion_factor("hartree", "kcal / mol")
-        out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+        try:
+            e = psi4.energy(f"{l}")
+            e *= constants.conversion_factor("hartree", "kcal / mol")
+            ie = psi4.core.variable("SAPT(DFT) TOTAL ENERGY")
+            ELST = psi4.core.variable("SAPT ELST ENERGY")
+            EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+            IND = psi4.core.variable("SAPT IND ENERGY")
+            DISP = psi4.core.variable("SAPT DISP ENERGY")
+            mult = constants.conversion_factor("hartree", "kcal / mol")
+            out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
         es.append(out_energies)
-
         handle_hrcl_psi4_cleanup(js, l)
     return es
 
