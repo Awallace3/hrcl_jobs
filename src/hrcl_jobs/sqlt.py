@@ -969,6 +969,7 @@ def collect_ids_for_parallel(
     sort_column: str = "Geometry",
     matches: dict = {"SAPT0_adz": "NULL"},
     id_value: str = "id",
+    joiner: str ="AND",
     ascending: bool = True,
 ) -> []:
     """
@@ -995,6 +996,7 @@ def collect_ids_for_parallel(
                 sort_column,
             ],
             matches=matches,
+            joiner=joiner,
         )
         query = [(i[0], len(i[1])) for i in query]
         query = sorted(query, key=lambda x: x[1], reverse=ascending)
