@@ -1050,7 +1050,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         psi4.set_num_threads(js.extra_info["num_threads"])
     return
 
-def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
+def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
         job_dir = js.extra_info["out"]["path"]
@@ -1066,10 +1066,11 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0):
             )
             f.write(json_dump)
 
-    psi4.core.clean()
-    psi4.core.clean_options()
-    psi4.core.clean_variables()
-    psi4.core.clean_timers()
+    if psi4_clean_all:
+        psi4.core.clean()
+        psi4.core.clean_options()
+        psi4.core.clean_variables()
+        psi4.core.clean_timers()
     return
 
 
@@ -1099,6 +1100,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
 
             # Cation monomer energy
             sub_job = 2
+            js.extra_info["options"]["scf__guess"] = "read"
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_cation)
             E_cation, wfn_c = psi4.energy(l, return_wfn=True)
