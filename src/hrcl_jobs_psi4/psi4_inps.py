@@ -1100,6 +1100,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
 
             # Cation monomer energy
             sub_job = 2
+            # Used to read in neutral density as guess for cation, investigate if breaks
             js.extra_info["options"]["scf__guess"] = "read"
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_cation)
