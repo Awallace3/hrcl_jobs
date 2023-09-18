@@ -59,6 +59,7 @@ def new_table(
 ):
     conn, cur = establish_connection(db_path)
     headers = ",\n".join([f"{k} {v}" for k, v in table.items()])
+    print(headers)
     if not conn:
         return
     table_format = f""" CREATE TABLE {table_name} (
@@ -930,7 +931,7 @@ def create_update_table(
     db_path: str,
     table_name: str,
     table_cols: dict,
-    data: dict,
+    data: dict = {},
 ) -> bool:
     """
     create_update_table will either create a new table
@@ -940,25 +941,25 @@ def create_update_table(
 
     table_exists = new_table(db_path, table_name, table_cols)
     con, cur = establish_connection(db_path)
+    table_add_columns(con, table_name, table_cols)
     if table_exists:
-        insertion, vals = [], []
-        v_len = len(data[list(data.keys())[0]])
-        for k, v in data.items():
-            insertion.append(k)
-            vals.append(v)
-            if len(v) != v_len:
-                print("ERROR: data length mismatch", k, len(v), v_len)
-                return False
+        if len(data) > 0:
+            print("Updating Table...")
+            insertion, vals = [], []
+            v_len = len(data[list(data.keys())[0]])
+            for k, v in data.items():
+                insertion.append(k)
+                vals.append(v)
+                if len(v) != v_len:
+                    print("ERROR: data length mismatch", k, len(v), v_len)
+                    return False
 
-        vals = tuple(vals)
-        cnt = 0
-        for r in zip(*vals):
-            insert_new_row(cur, con, table_name, insertion, r)
-            cnt += 1
-        print(f"Inserted {cnt} rows into {table_name}")
-    else:
-        table_add_columns(con, table_name, table_cols)
-        print("Skipping Insertions...")
+            vals = tuple(vals)
+            cnt = 0
+            for r in zip(*vals):
+                insert_new_row(cur, con, table_name, insertion, r)
+                cnt += 1
+            print(f"Inserted {cnt} rows into {table_name}")
     return True
 
 

@@ -16,6 +16,7 @@ def get_basis_set(basis_str: str) -> str:
     elif basis_str == "mtz":
         basis = "may-cc-pvtz"
     else:
+        print(f"Basis Set Abbreviation: {basis_str}")
         raise ValueError(
             "Basis Set Abbreviation not recognized by hrcl_jobs_psi4.basis_sets.py"
         )
