@@ -1024,7 +1024,7 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
     return out
 
 
-def generate_job_dir(js, sub_job):
+def generate_job_dir(js, l, sub_job):
     job_dir = js.extra_info["out"]["path"]
     clean_name = (
         l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
@@ -1047,8 +1047,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
             os.path.abspath(os.path.expanduser(js.extra_info["scratch"]["path"]))
         )
     if generate_outputs:
-        job_dir = js.extra_info["out"]["path"]
-        job_dir = generate_job_dir(job_dir, sub_job)
+        job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
         psi4.core.print_out(f"{js}")
@@ -1062,8 +1061,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
 def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
-        job_dir = js.extra_info["out"]["path"]
-        job_dir = generate_job_dir(job_dir, sub_job)
+        job_dir = generate_job_dir(js, l, sub_job)
         with open(f"{job_dir}/psi4_vars.json", "w") as f:
             json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
             f.write(json_dump)
