@@ -1024,6 +1024,19 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
     return out
 
 
+def generate_job_dir(js, sub_job):
+    job_dir = js.extra_info["out"]["path"]
+    clean_name = (
+        l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
+    )
+    job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+    if js.extra_info["out"]["sub_path"]:
+        job_dir += f"/{js.extra_info['out']['sub_path']}"
+    if sub_job != 0:
+        job_dir += f"/{sub_job}"
+    return job_dir
+
+
 def handle_hrcl_extra_info_options(js, l, sub_job=0):
     psi4.set_memory(js.mem)
     psi4.set_options(js.extra_info["options"])
@@ -1035,14 +1048,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         )
     if generate_outputs:
         job_dir = js.extra_info["out"]["path"]
-        clean_name = (
-            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
-        )
-        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-        if js.extra_info['out']['sub_path']:
-            job_dir += f"/{js.extra_info['out']['sub_path']}"
-        if sub_job != 0:
-            job_dir += f"/{sub_job}"
+        job_dir = generate_job_dir(job_dir, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
         psi4.core.print_out(f"{js}")
@@ -1052,22 +1058,14 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         psi4.set_num_threads(js.extra_info["num_threads"])
     return
 
+
 def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
         job_dir = js.extra_info["out"]["path"]
-        clean_name = (
-            l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
-        )
-        job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-        if js.extra_info['out']['sub_path']:
-            job_dir += f"/{js.extra_info['out']['sub_path']}"
-        if sub_job != 0:
-            job_dir += f"/{sub_job}"
+        job_dir = generate_job_dir(job_dir, sub_job)
         with open(f"{job_dir}/psi4_vars.json", "w") as f:
-            json_dump = json.dumps(
-                psi4.core.variables(), indent=4, cls=NumpyEncoder
-            )
+            json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
             f.write(json_dump)
 
     if psi4_clean_all:
