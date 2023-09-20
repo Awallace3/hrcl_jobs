@@ -1087,8 +1087,8 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
     geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
     for l in js.extra_info["level_theory"]:
         # Neutral monomer energy
+        sub_job = "neutral"
         try:
-            sub_job = "neutral"
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_neutral)
             E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
@@ -1122,5 +1122,5 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
             out.append(None)
             out.append(None)
             print(e)
-            handle_hrcl_psi4_cleanup(js, l, 1)
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
     return out
