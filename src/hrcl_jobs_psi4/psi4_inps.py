@@ -1039,6 +1039,8 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
             l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
         )
         job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
+        if js.extra_info['out']['sub_path']:
+            job_dir += f"/{js.extra_info['out']['sub_path']}"
         if sub_job != 0:
             job_dir += f"/{sub_job}"
         os.makedirs(job_dir, exist_ok=True)
@@ -1088,7 +1090,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
     for l in js.extra_info["level_theory"]:
         # Neutral monomer energy
         try:
-            sub_job = 1
+            sub_job = "neutral"
             handle_hrcl_extra_info_options(js, l, sub_job)
             psi4.geometry(geom_neutral)
             E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
@@ -1099,7 +1101,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
             handle_hrcl_psi4_cleanup(js, l, sub_job)
 
             # Cation monomer energy
-            sub_job = 2
+            sub_job = "cation"
             # Used to read in neutral density as guess for cation, investigate if breaks
             # js.extra_info["options"]["scf__guess"] = "read"
             handle_hrcl_extra_info_options(js, l, sub_job)
