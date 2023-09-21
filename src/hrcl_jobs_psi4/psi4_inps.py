@@ -1030,7 +1030,7 @@ def generate_job_dir(js, l, sub_job):
         l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
     )
     job_dir += f"/{js.id_label}/{clean_name}_{js.extra_info['out']['version']}"
-    if js.extra_info["out"]["sub_path"]:
+    if "out" in js.extra_info.keys() and "sub_path" in js.extra_info["out"].keys():
         job_dir += f"/{js.extra_info['out']['sub_path']}"
     if sub_job != 0:
         job_dir += f"/{sub_job}"
