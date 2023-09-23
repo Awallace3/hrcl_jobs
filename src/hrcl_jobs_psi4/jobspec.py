@@ -78,6 +78,19 @@ def sapt0_js_headers():
         "charges",
     ]
 
+@dataclass
+class saptdft_sapt_2p3_js:
+    id_label: int
+    psi4_input: str
+    extra_info: {}
+    mem: str
+
+
+def saptdft_sapt_2p3_js_headers():
+    return [
+        "id",
+        "psi4_input",
+    ]
 
 @dataclass
 class saptdft_js:

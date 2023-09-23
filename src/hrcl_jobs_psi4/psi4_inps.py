@@ -1062,7 +1062,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
-        with open(f"{job_dir}/psi4_vars.json", "w") as f:
+        with open(f"{job_dir}/{sub_job}_vars.json", "w") as f:
             json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
             f.write(json_dump)
 
@@ -1124,3 +1124,30 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
             print(e)
             handle_hrcl_psi4_cleanup(js, l, sub_job)
     return out
+
+
+def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = js.psi4_input
+    es = [[]]
+    mol = psi4.geometry(geom)
+    l = "sapt_dft_2p3"
+    try:
+        sub_job = "sapt_dft"
+        handle_hrcl_extra_info_options(js, l, sub_job)
+        e1 = psi4.energy("sapt(dft)")
+        es[0].append(psi4.core.variable("EXCH-IND20,R (S^INF)"))
+        es[0].append(psi4.core.variable("SAPT EXCH-DISP20(S^INF) ENERGY"))
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
+
+        sub_job = "sapt_2p3"
+        handle_hrcl_extra_info_options(js, l, sub_job)
+        e2 = psi4.energy("sapt2+3")
+        es[0].append(psi4.core.variable("SAPT EXCH-IND30(S^INF) ENERGY"))
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
+    except Exception as e:
+        print("Exception:", e)
+        out_energies = None
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
+        return [[None, None, None]]
+    return es
