@@ -1151,3 +1151,61 @@ def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
         handle_hrcl_psi4_cleanup(js, l, sub_job)
         return [None, None, None]
     return es
+
+
+def run_MBIS_IE(js: jobspec.saptdft_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = js.psi4_input
+    es = []
+    mol = psi4.geometry(geom)
+    for l in js.extra_info["level_theory"]:
+        try:
+            sub_job = "MBIS_dimer"
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_d, wfn_d = psi4.energy(l, return_wfn=True)
+            oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
+            cp_ie = psi4_vars["CP-CORRECTED INTERACTION ENERGY"]
+            vol_ratio_d = np.array(wfn.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+
+            sub_job = "MBIS_monA"
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_a, wfn_a = psi4.energy(l, return_wfn=True)
+            oeprop(wfn_a, "MBIS_VOLUME_RATIOS")
+            vol_ratio_a = np.array(wfn.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+
+            sub_job = "MBIS_monB"
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_b, wfn_b = psi4.energy(l, return_wfn=True)
+            oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
+            vol_ratio_b = np.array(wfn.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+            es.append(
+                [
+                    cp_ie,
+                    e_d,
+                    e_a,
+                    e_b,
+                    vol_ratio_d,
+                    vol_ratio_a,
+                    vol_ratio_b,
+                ]
+            )
+
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+            es.append(
+                [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ]
+            )
+    return es

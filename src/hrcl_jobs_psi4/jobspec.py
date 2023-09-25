@@ -68,7 +68,6 @@ class sapt0_js:
     extra_info: {}
     mem: str
 
-
 def sapt0_js_headers():
     return [
         "id",
@@ -77,6 +76,25 @@ def sapt0_js_headers():
         "monBs",
         "charges",
     ]
+
+@dataclass
+class psi4_input_str_monABs_js:
+    id_label: int
+    psi4_input: np.array
+    monAs: np.array
+    monBs: np.array
+    extra_info: {}
+    mem: str
+
+
+def psi4_input_str_monABs_js_headers():
+    return [
+        "id",
+        "psi4_input",
+        "monAs",
+        "monBs",
+    ]
+
 
 @dataclass
 class saptdft_sapt_2p3_js:
@@ -91,6 +109,22 @@ def saptdft_sapt_2p3_js_headers():
         "id",
         "psi4_input",
     ]
+
+
+@dataclass
+class saptdft_sapt_2p3_js:
+    id_label: int
+    psi4_input: str
+    extra_info: {}
+    mem: str
+
+
+def saptdft_sapt_2p3_js_headers():
+    return [
+        "id",
+        "psi4_input",
+    ]
+
 
 @dataclass
 class saptdft_js:
