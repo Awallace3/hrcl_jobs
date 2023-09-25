@@ -1153,36 +1153,34 @@ def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
     return es
 
 
-def run_MBIS_IE(js: jobspec.sapt0_js) -> np.array:
+def run_MBIS_IE(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
     geom_d = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
     )
     geom_A, geom_B = geom_d.split("--")
+    geom_A += "\nunits angstrom"
+    # print(geom_d, geom_A, geom_B, sep="\n\n")
 
     for l in js.extra_info["level_theory"]:
         try:
             sub_job = "MBIS_dimer"
-            psi4.geometry(geom_d)
+            mol_d = psi4.geometry(geom_d)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('dimer energy', e_d)
             oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
             vol_ratio_d = np.array(wfn_d.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            e, wfn = psi4.energy(
-                f"{method}/aug-cc-pvdz", bsse_type="cp", return_wfn=True, molecule=mol
-            )
-            psi4_vars = psi4.core.variables()
-            print(psi4_vars)
-            cp_ie = psi4_vars["CP-CORRECTED INTERACTION ENERGY"]
-            handle_hrcl_psi4_cleanup(js, l, sub_job)
-
 
             sub_job = "MBIS_monA"
             psi4.geometry(geom_A)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_a, wfn_a = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('monA energy', e_a)
             oeprop(wfn_a, "MBIS_VOLUME_RATIOS")
             vol_ratio_a = np.array(wfn_a.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
@@ -1191,10 +1189,11 @@ def run_MBIS_IE(js: jobspec.sapt0_js) -> np.array:
             psi4.geometry(geom_B)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_b, wfn_b = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('monB energy', e_b)
             oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
             vol_ratio_b = np.array(wfn_b.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            es.append(cp_ie)
             es.append(e_d)
             es.append(e_a)
             es.append(e_b)
