@@ -1164,7 +1164,7 @@ def run_MBIS_IE(js: jobspec.saptdft_js) -> np.array:
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
             oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
-            cp_ie = psi4_vars["CP-CORRECTED INTERACTION ENERGY"]
+            cp_ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
             vol_ratio_d = np.array(wfn.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
 
@@ -1181,31 +1181,18 @@ def run_MBIS_IE(js: jobspec.saptdft_js) -> np.array:
             oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
             vol_ratio_b = np.array(wfn.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            es.append(
-                [
-                    cp_ie,
-                    e_d,
-                    e_a,
-                    e_b,
-                    vol_ratio_d,
-                    vol_ratio_a,
-                    vol_ratio_b,
-                ]
-            )
+            es.append( cp_ie)
+            es.append(e_d)
+            es.append(e_a)
+            es.append(e_b)
+            es.append(vol_ratio_d)
+            es.append(vol_ratio_a)
+            es.append(vol_ratio_b)
 
         except Exception as e:
             print("Exception:", e)
             out_energies = None
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            es.append(
-                [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ]
-            )
+            for i in range(7):
+                es.append(None)
     return es

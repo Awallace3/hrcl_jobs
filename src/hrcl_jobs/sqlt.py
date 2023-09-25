@@ -522,6 +522,9 @@ def collect_id_into_js(
     collect_rows collects a range of rows for a table with requested headers.
     The headers list must match the dataclass_obj's fields.
     """
+    if callable(headers):
+        headers = headers()
+
     cols = ", ".join(headers)
     sql_cmd = f"""SELECT {cols} FROM {table} WHERE {id_label} = {id_value};
 """
