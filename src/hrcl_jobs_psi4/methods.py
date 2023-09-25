@@ -4,6 +4,8 @@ simple_methods = [
     "ccsd",
     "ccsd(t)",
     "sapt0",
+    "pbe0",
+    "pbe",
 ]
 
 
