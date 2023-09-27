@@ -1208,3 +1208,52 @@ def run_MBIS_IE(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             for i in range(7):
                 es.append(None)
     return es
+
+
+def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    bsse_type = js.extra_info["bsse_type"]
+    ie = [None]
+    sub_job = "ie"
+    for l in js.extra_info["level_theory"]:
+        mol = psi4.geometry(geom)
+        handle_hrcl_extra_info_options(js, l, sub_job)
+        try:
+            e = psi4.energy(f"{l}", bsse_type=bsse_type)
+            e *= constants.conversion_factor("hartree", "kcal / mol")
+            ie[0] = e * psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        except Exception as e:
+            print("Exception:", e)
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
+    return ie
+
+def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
+    """ """
+
+    for l in level_theory:
+        mol = psi4.geometry(geom)
+        psi4.set_memory(ppm)
+        psi4.set_options(
+            {
+                "d_convergence": d_convergence,
+                "freeze_core": "True",
+                "guess": "sad",
+                "scf_type": scf_type,
+                # "cholesky_tolerance": 1e-6 # default about 1e-4
+                # check psi4/src/read_options
+            }
+        )
+        # psi4.core.be_quiet()
+        if cp:
+            e = psi4.energy(l)
+            ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+        else:
+            e = psi4.energy(l, bsse_type="nocp")
+            ie = psi4.core.variable("NOCP-CORRECTED INTERACTION ENERGY")
+        ie *= constants.conversion_factor("hartree", "kcal / mol")
+        es.append(ie)
+        psi4.core.clean()
+    return es

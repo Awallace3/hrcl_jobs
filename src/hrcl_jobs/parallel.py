@@ -242,6 +242,9 @@ def ms_sl_extra_info(
     mpiexec -n 2 python3 -u main.py
     ```
     """
+    if len(id_list) == 0:
+        print("No ids to run")
+        return
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
