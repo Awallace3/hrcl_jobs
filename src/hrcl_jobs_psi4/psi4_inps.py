@@ -853,9 +853,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     es = []
     for l in js.extra_info["level_theory"]:
         handle_hrcl_extra_info_options(js, l)
-
-        # psi4.core.IOManager.shared_object().set_default_path(os.path.abspath(os.path.expanduser(args["scratch"])))
-        # concatenate HASH with PID
         mol = psi4.geometry(geom)
         e = psi4.energy(f"{l}")
 
@@ -1067,10 +1064,10 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
             f.write(json_dump)
 
     if psi4_clean_all:
-        psi4.core.clean()
         psi4.core.clean_options()
         psi4.core.clean_variables()
         psi4.core.clean_timers()
+        psi4.core.clean()
     return
 
 
@@ -1223,8 +1220,7 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
         handle_hrcl_extra_info_options(js, l, sub_job)
         try:
             e = psi4.energy(f"{l}", bsse_type=bsse_type)
-            e *= constants.conversion_factor("hartree", "kcal / mol")
-            ie[0] = e * psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
+            ie[0] = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
         except Exception as e:
             print("Exception:", e)
         handle_hrcl_psi4_cleanup(js, l, sub_job)
