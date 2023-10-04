@@ -1055,11 +1055,14 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
     return
 
 
-def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True):
+def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
         with open(f"{job_dir}/{sub_job}_vars.json", "w") as f:
+            out = psi4.core.variables()
+            if wfn is not None:
+                out["wfn"] = wfn.variables()
             json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
             f.write(json_dump)
 
@@ -1150,7 +1153,7 @@ def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
     return es
 
 
-def run_MBIS_IE(js: jobspec.sapt0_js, print_energies=False) -> np.array:
+def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
     geom_d = tools.generate_p4input_from_df(
@@ -1191,6 +1194,59 @@ def run_MBIS_IE(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
             vol_ratio_b = np.array(wfn_b.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
+            es.append(vol_ratio_d)
+            es.append(vol_ratio_a)
+            es.append(vol_ratio_b)
+
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+            for i in range(7):
+                es.append(None)
+    return es
+
+def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    es = []
+    geom_d = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    geom_A, geom_B = geom_d.split("--")
+    geom_A += "\nunits angstrom"
+    # print(geom_d, geom_A, geom_B, sep="\n\n")
+
+    for l in js.extra_info["level_theory"]:
+        try:
+            sub_job = "MBIS_dimer"
+            mol_d = psi4.geometry(geom_d)
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_d, wfn_d = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('dimer energy', e_d)
+            oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
+            vol_ratio_d = np.array(wfn_d.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
+
+            sub_job = "MBIS_monA"
+            psi4.geometry(geom_A)
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_a, wfn_a = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('monA energy', e_a)
+            oeprop(wfn_a, "MBIS_VOLUME_RATIOS")
+            vol_ratio_a = np.array(wfn_a.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_a)
+
+            sub_job = "MBIS_monB"
+            psi4.geometry(geom_B)
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_b, wfn_b = psi4.energy(l, return_wfn=True)
+            if print_energies:
+                print('monB energy', e_b)
+            oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
+            vol_ratio_b = np.array(wfn_b.variable("MBIS VOLUME RATIOS"))
+            handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_b)
             es.append(e_d)
             es.append(e_a)
             es.append(e_b)
@@ -1205,7 +1261,6 @@ def run_MBIS_IE(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             for i in range(7):
                 es.append(None)
     return es
-
 
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -1253,3 +1308,33 @@ def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
         es.append(ie)
         psi4.core.clean()
     return es
+
+
+def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    es = []
+    if not generate_outputs:
+        print("No output file specified. Not generating input files.")
+    for l in js.extra_info["level_theory"]:
+        sub_job = "dlpno-ccsd"
+        job_dir = generate_job_dir(js, l, sub_job)
+        os.makedirs(job_dir, exist_ok=True)
+        with open(f"{job_dir}/psi4.in", "w") as f:
+            f.write(f"""
+memory {js.mem}
+
+molecule dimer {{
+{geom}
+no_com
+no_reorient
+}}
+set {{
+    {js.extra_info["options"]}
+}}
+
+{js.extra_info['function_call']}
+        """)
+    return [None for i in range(len(js.extra_info["level_theory"]))]

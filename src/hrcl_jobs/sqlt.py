@@ -1003,7 +1003,8 @@ def collect_ids_for_parallel(
             joiner=joiner,
         )
         query = [(i[0], len(i[1])) for i in query]
-        query = sorted(query, key=lambda x: x[1], reverse=ascending)
+        if ascending is not None:
+            query = sorted(query, key=lambda x: x[1], reverse=ascending)
         id_list = [i[0] for i in query]
         print(f"MAIN: {len(id_list)} computations to run")
     id_list = comm.bcast(id_list, root=0)
