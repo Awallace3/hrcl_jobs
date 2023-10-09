@@ -3,6 +3,7 @@ import subprocess
 import time
 import os
 from . import sqlt
+from . import parallel
 import hrcl_jobs_psi4 as hrcl_psi4
 import numpy as np
 import pandas as pd
@@ -10,9 +11,6 @@ from qm_tools_aw import tools
 from pprint import pprint as pp
 from mpi4py import MPI
 from glob import glob
-
-TESTING = False
-HEX = True if TESTING else False
 
 HIVE_PARAMS = {
     "mem_per_process": "60 gb",
@@ -26,11 +24,11 @@ def machine_list_resources(rank_0_one_thread=True) -> []:
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     machines = {
-        "ds2": hrcl.parallel.machineResources("ds2", 9, 9, 80),
-        "hex6": hrcl.parallel.machineResources("hex6", 6, 6, 62),
-        "hex8": hrcl.parallel.machineResources("hex8", 6, 6, 62),
-        "hex9": hrcl.parallel.machineResources("hex9", 6, 6, 58),
-        "hex11": hrcl.parallel.machineResources("hex11", 6, 6, 62),
+        "ds2": parallel.machineResources("ds2", 9, 9, 80),
+        "hex6": parallel.machineResources("hex6", 6, 6, 62),
+        "hex8": parallel.machineResources("hex8", 6, 6, 62),
+        "hex9": parallel.machineResources("hex9", 6, 6, 58),
+        "hex11": parallel.machineResources("hex11", 6, 6, 62),
     }
     uname_n = subprocess.check_output("uname -n", shell=True).decode("utf-8").strip()
 
@@ -108,9 +106,17 @@ def compute_MBIS(
     col_check="MBIS_hf_adz",
     hex=True,
     hive_params=HIVE_PARAMS,
-    col_check="MBIS_adz",
+    TESTING=False,
 ) -> None:
-    method, basis = hrcl_psi4.get_level_of_theory(col_check)
+    if hex:
+        machine = machine_list_resources()
+        memory_per_thread = f"{machine.memory_per_thread} gb"
+        num_omp_threads = machine.omp_threads
+    else:
+        memory_per_thread = hive_params["mem_per_process"]
+        num_omp_threads = hive_params["num_omp_threads"]
+    method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
+    basis = col_check.split("_")[-1]
     table_cols={
         f"MBIS_{method}_multipoles_d_{basis}": "FLOAT",
         f"MBIS_{method}_multipoles_a_{basis}": "FLOAT",
@@ -123,14 +129,12 @@ def compute_MBIS(
         f"MBIS_{method}_vol_ratio_b_{basis}": "array",
     }
     from mpi4py import MPI
-
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
-    sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-
-    headers_sql_sapt_dft_2p3 = hrcl_psi4.jobspec.saptdft_sapt_2p3_js_headers()
-    col_check_MBIS = f"MBIS_{methods}_widths_d_{basis}"
+    if rank == 0:
+        sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
+    col_check_MBIS = f"MBIS_{method}_widths_d_{basis}"
     if hex:
         machine = machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
@@ -161,12 +165,12 @@ def compute_MBIS(
         "num_threads": num_omp_threads,
         "level_theory": [f"{method}/{basis_str}"],
         "out": {
-            "path": "diatomics",
+            "path": "schr",
             "version": "1",
         },
     }
     print(xtra_mbis)
-    hrcl.parallel.ms_sl_extra_info(
+    parallel.ms_sl_extra_info(
         id_list=mbis_ids,
         db_path=DB_NAME,
         table_name=TABLE_NAME,
