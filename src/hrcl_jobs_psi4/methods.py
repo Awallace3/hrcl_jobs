@@ -15,6 +15,8 @@ def get_methods(in_method: str) -> str:
         return in_method.lower()
     if in_method.lower() == "SAPT_DFT":
         method = "SAPT(DFT)"
+    elif "MBIS" in in_method:
+        method = in_method.split("_")[1]
     else:
         print(f"Method Shortened: {in_method}")
         raise ValueError("in_method not recognized by hrcl_jobs_psi4.methos.py")

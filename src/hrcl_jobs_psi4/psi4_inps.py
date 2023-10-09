@@ -1153,7 +1153,7 @@ def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
     return es
 
 
-def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
+def run_MBIS_mbs(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
     geom_d = tools.generate_p4input_from_df(
@@ -1206,6 +1206,22 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
                 es.append(None)
     return es
 
+def MBIS_props_from_wfn(wfn):
+    oeprop(wfn, "MBIS_VOLUME_RATIOS")
+    charges = np.array(wfn.variable("MBIS CHARGES"))
+    dipoles = np.array(wfn.variable("MBIS DIPOLES"))
+    widths = np.array(wfn.variable("MBIS VALENCE WIDTHS"))
+    try:
+        vol_ratio = np.array(wfn.variable("MBIS VOLUME RATIOS"))
+    except KeyError:
+        vol_ratio = np.ones(1)
+    quad = np.array(wfn.variable("MBIS QUADRUPOLES"))
+    quad = [q[np.triu_indices(3)] for q in quad]
+    quadrupoles = np.array(quad)
+    multipoles = np.concatenate([charges, dipoles, quadrupoles], axis=1)
+    return wfn, multipoles, widths, vol_ratio
+
+
 def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
@@ -1214,7 +1230,6 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     )
     geom_A, geom_B = geom_d.split("--")
     geom_A += "\nunits angstrom"
-    # print(geom_d, geom_A, geom_B, sep="\n\n")
 
     for l in js.extra_info["level_theory"]:
         try:
@@ -1222,34 +1237,28 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             mol_d = psi4.geometry(geom_d)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
-            if print_energies:
-                print('dimer energy', e_d)
-            oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
-            vol_ratio_d = np.array(wfn_d.variable("MBIS VOLUME RATIOS"))
+            wfn_d, multipoles_d, widths_d, vol_ratio_d = MBIS_props_from_wfn(wfn_d)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
 
             sub_job = "MBIS_monA"
             psi4.geometry(geom_A)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_a, wfn_a = psi4.energy(l, return_wfn=True)
-            if print_energies:
-                print('monA energy', e_a)
-            oeprop(wfn_a, "MBIS_VOLUME_RATIOS")
-            vol_ratio_a = np.array(wfn_a.variable("MBIS VOLUME RATIOS"))
+            wfn_a, multipoles_a, widths_a, vol_ratio_a = MBIS_props_from_wfn(wfn_a)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_a)
 
             sub_job = "MBIS_monB"
             psi4.geometry(geom_B)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_b, wfn_b = psi4.energy(l, return_wfn=True)
-            if print_energies:
-                print('monB energy', e_b)
-            oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
-            vol_ratio_b = np.array(wfn_b.variable("MBIS VOLUME RATIOS"))
+            wfn_b, multipoles_b, widths_b, vol_ratio_b = MBIS_props_from_wfn(wfn_b)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_b)
-            es.append(e_d)
-            es.append(e_a)
-            es.append(e_b)
+            es.append(multipoles_d)
+            es.append(multipoles_a)
+            es.append(multipoles_b)
+            es.append(widths_d)
+            es.append(widths_a)
+            es.append(widths_b)
             es.append(vol_ratio_d)
             es.append(vol_ratio_a)
             es.append(vol_ratio_b)
@@ -1258,7 +1267,7 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             print("Exception:", e)
             out_energies = None
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            for i in range(7):
+            for i in range(9):
                 es.append(None)
     return es
 
