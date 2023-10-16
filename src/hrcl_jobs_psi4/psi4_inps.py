@@ -1047,6 +1047,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
+        print(job_dir)
         psi4.core.print_out(f"{js}")
     else:
         psi4.core.be_quiet()
@@ -1063,7 +1064,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
             out = psi4.core.variables()
             if wfn is not None:
                 out["wfn"] = wfn.variables()
-            json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
+            json_dump = json.dumps(out, indent=4, cls=NumpyEncoder)
             f.write(json_dump)
 
     if psi4_clean_all:
@@ -1271,6 +1272,36 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
                 es.append(None)
     return es
 
+def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    es = []
+    geom_d = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    geom_A, geom_B = geom_d.split("--")
+    geom_A += "\nunits angstrom"
+
+    for l in js.extra_info["level_theory"]:
+        try:
+            sub_job = "MBIS_mon"
+            mol_d = psi4.geometry(geom_d)
+            handle_hrcl_extra_info_options(js, l, sub_job)
+            e_d, wfn_d = psi4.energy(l, return_wfn=True)
+            wfn_d, multipoles_d, widths_d, vol_ratio_d = MBIS_props_from_wfn(wfn_d)
+            handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
+
+            es.append(multipoles_d)
+            es.append(widths_d)
+            es.append(vol_ratio_d)
+
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
+            handle_hrcl_psi4_cleanup(js, l, sub_job)
+            for i in range(3):
+                es.append(None)
+    return es
+
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
@@ -1331,8 +1362,20 @@ def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
         sub_job = "dlpno-ccsd"
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
+        opts = ""
+        for k, v in js.extra_info["options"].items():
+            opts += f"{k} {v}\n"
         with open(f"{job_dir}/psi4.in", "w") as f:
             f.write(f"""
+import json
+import numpy as np
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
 memory {js.mem}
 
 molecule dimer {{
@@ -1341,9 +1384,14 @@ no_com
 no_reorient
 }}
 set {{
-    {js.extra_info["options"]}
+    {opts}
 }}
 
 {js.extra_info['function_call']}
+
+with open("vars.json", "w") as f:
+     json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
+     f.write(json_dump)
+
         """)
     return [None for i in range(len(js.extra_info["level_theory"]))]

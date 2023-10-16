@@ -78,6 +78,22 @@ def sapt0_js_headers():
     ]
 
 @dataclass
+class monomer_js:
+    id_label: int
+    geometry: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str
+
+def monomer_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "charges",
+    ]
+
+
+@dataclass
 class psi4_input_str_monABs_js:
     id_label: int
     psi4_input: np.array
