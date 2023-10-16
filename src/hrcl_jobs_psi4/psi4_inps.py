@@ -1063,7 +1063,13 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
         with open(f"{job_dir}/{sub_job}_vars.json", "w") as f:
             out = psi4.core.variables()
             if wfn is not None:
-                out["wfn"] = wfn.variables()
+                tmp = {}
+                for k, v in wfn.variables().items():
+                    if isinstance(v, psi4.core.Matrix):
+                        tmp[k] = v.to_array(dense=True)
+                    else:
+                        tmp[k] = v
+                out["wfn"] = tmp
             json_dump = json.dumps(out, indent=4, cls=NumpyEncoder)
             f.write(json_dump)
 
@@ -1275,16 +1281,15 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
 def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
-    geom_d = tools.generate_p4input_from_df(
-        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    monAs = [i for i in range(len(js.geometry))]
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, monAs, units="angstrom"
     )
-    geom_A, geom_B = geom_d.split("--")
-    geom_A += "\nunits angstrom"
 
     for l in js.extra_info["level_theory"]:
         try:
             sub_job = "MBIS_mon"
-            mol_d = psi4.geometry(geom_d)
+            mol_d = psi4.geometry(geom)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
             wfn_d, multipoles_d, widths_d, vol_ratio_d = MBIS_props_from_wfn(wfn_d)

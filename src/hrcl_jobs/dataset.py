@@ -203,15 +203,9 @@ def compute_MBIS_atom(
     method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
     basis = col_check.split("_")[-1]
     table_cols={
-        f"MBIS_{method}_multipoles_d_{basis}": "FLOAT",
-        f"MBIS_{method}_multipoles_a_{basis}": "FLOAT",
-        f"MBIS_{method}_multipoles_b_{basis}": "FLOAT",
-        f"MBIS_{method}_widths_d_{basis}": "array",
-        f"MBIS_{method}_widths_a_{basis}": "array",
-        f"MBIS_{method}_widths_b_{basis}": "array",
-        f"MBIS_{method}_vol_ratio_d_{basis}": "array",
-        f"MBIS_{method}_vol_ratio_a_{basis}": "array",
-        f"MBIS_{method}_vol_ratio_b_{basis}": "array",
+        f"MBIS_{method}_multipoles_{basis}": "FLOAT",
+        f"MBIS_{method}_widths_{basis}": "array",
+        f"MBIS_{method}_vol_ratio_{basis}": "array",
     }
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -261,7 +255,7 @@ def compute_MBIS_atom(
         table_name=TABLE_NAME,
         js_obj=hrcl_psi4.jobspec.monomer_js,
         headers_sql=hrcl_psi4.jobspec.monomer_js_headers(),
-        run_js_job=hrcl_psi4.psi4_inps.run_MBIS,
+        run_js_job=hrcl_psi4.psi4_inps.run_MBIS_monomer,
         extra_info=xtra_mbis,
         ppm=memory_per_thread,
         id_label="id",
