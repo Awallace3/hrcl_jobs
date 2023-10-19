@@ -213,7 +213,7 @@ def compute_MBIS_atom(
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-    col_check_MBIS = f"MBIS_{method}_widths_d_{basis}"
+    col_check_MBIS = f"MBIS_{method}_widths_{basis}"
     if hex:
         machine = machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
