@@ -244,7 +244,7 @@ def compute_MBIS_atom(
         "num_threads": num_omp_threads,
         "level_theory": [f"{method}/{basis_str}"],
         "out": {
-            "path": "schr",
+            "path": "atomic_props",
             "version": "1",
         },
     }
