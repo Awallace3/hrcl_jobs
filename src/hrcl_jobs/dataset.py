@@ -206,6 +206,9 @@ def compute_MBIS_atom(
         f"MBIS_{method}_multipoles_{basis}": "FLOAT",
         f"MBIS_{method}_widths_{basis}": "array",
         f"MBIS_{method}_vol_ratio_{basis}": "array",
+        f"MBIS_{method}_radial_2_{basis}": "array",
+        f"MBIS_{method}_radial_3_{basis}": "array",
+        f"MBIS_{method}_radial_4_{basis}": "array",
     }
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
