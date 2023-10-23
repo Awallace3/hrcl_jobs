@@ -127,6 +127,18 @@ def compute_MBIS(
         f"MBIS_{method}_vol_ratio_d_{basis}": "array",
         f"MBIS_{method}_vol_ratio_a_{basis}": "array",
         f"MBIS_{method}_vol_ratio_b_{basis}": "array",
+        f"MBIS_{method}_radial_2_d_{basis}": "array",
+        f"MBIS_{method}_radial_2_a_{basis}": "array",
+        f"MBIS_{method}_radial_2_b_{basis}": "array",
+        f"MBIS_{method}_radial_3_d_{basis}": "array",
+        f"MBIS_{method}_radial_3_a_{basis}": "array",
+        f"MBIS_{method}_radial_3_b_{basis}": "array",
+        f"MBIS_{method}_radial_4_d_{basis}": "array",
+        f"MBIS_{method}_radial_4_a_{basis}": "array",
+        f"MBIS_{method}_radial_4_b_{basis}": "array",
+        f"MBIS_{method}_populations_d_{basis}": "array",
+        f"MBIS_{method}_populations_a_{basis}": "array",
+        f"MBIS_{method}_populations_b_{basis}": "array",
     }
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -134,7 +146,7 @@ def compute_MBIS(
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-    col_check_MBIS = f"MBIS_{method}_widths_d_{basis}"
+    col_check_MBIS = f"MBIS_{method}_populations_b_{basis}"
     if hex:
         machine = machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
@@ -210,13 +222,13 @@ def compute_MBIS_atom(
         f"MBIS_{method}_radial_3_{basis}": "array",
         f"MBIS_{method}_radial_4_{basis}": "array",
     }
+    col_check_MBIS = f"MBIS_{method}_radial_2_{basis}"
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-    col_check_MBIS = f"MBIS_{method}_widths_{basis}"
     if hex:
         machine = machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"

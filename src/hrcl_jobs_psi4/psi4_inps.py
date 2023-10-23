@@ -1047,7 +1047,6 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
-        print(job_dir)
         psi4.core.print_out(f"{js}")
     else:
         psi4.core.be_quiet()
@@ -1177,7 +1176,7 @@ def run_MBIS_mbs(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
             if print_energies:
-                print('dimer energy', e_d)
+                print("dimer energy", e_d)
             oeprop(wfn_d, "MBIS_VOLUME_RATIOS")
             vol_ratio_d = np.array(wfn_d.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
@@ -1187,7 +1186,7 @@ def run_MBIS_mbs(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_a, wfn_a = psi4.energy(l, return_wfn=True)
             if print_energies:
-                print('monA energy', e_a)
+                print("monA energy", e_a)
             oeprop(wfn_a, "MBIS_VOLUME_RATIOS")
             vol_ratio_a = np.array(wfn_a.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
@@ -1197,7 +1196,7 @@ def run_MBIS_mbs(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_b, wfn_b = psi4.energy(l, return_wfn=True)
             if print_energies:
-                print('monB energy', e_b)
+                print("monB energy", e_b)
             oeprop(wfn_b, "MBIS_VOLUME_RATIOS")
             vol_ratio_b = np.array(wfn_b.variable("MBIS VOLUME RATIOS"))
             handle_hrcl_psi4_cleanup(js, l, sub_job)
@@ -1212,6 +1211,7 @@ def run_MBIS_mbs(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             for i in range(7):
                 es.append(None)
     return es
+
 
 def MBIS_props_from_wfn(wfn):
     oeprop(wfn, "MBIS_VOLUME_RATIOS")
@@ -1232,6 +1232,13 @@ def MBIS_props_from_wfn(wfn):
     return wfn, multipoles, widths, vol_ratio, radial_2, radial_3, radial_4
 
 
+def MBIS_population(geometry: np.array, multipoles: np.ndarray):
+    population = np.zeros(len(geometry))
+    for i, m in enumerate(multipoles):
+        population[i] = geometry[i, 0] - m[0]
+    return population
+
+
 def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
@@ -1247,21 +1254,48 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             mol_d = psi4.geometry(geom_d)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
-            wfn_d, multipoles_d, widths_d, vol_ratio_d, *radial = MBIS_props_from_wfn(wfn_d)
+            (
+                wfn_d,
+                multipoles_d,
+                widths_d,
+                vol_ratio_d,
+                radial_2_d,
+                radial_3_d,
+                radial_4_d,
+            ) = MBIS_props_from_wfn(wfn_d)
+            population_d = MBIS_population(js.geometry, multipoles_d)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
 
             sub_job = "MBIS_monA"
             psi4.geometry(geom_A)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_a, wfn_a = psi4.energy(l, return_wfn=True)
-            wfn_a, multipoles_a, widths_a, vol_ratio_a, *radial = MBIS_props_from_wfn(wfn_a)
+            (
+                wfn_a,
+                multipoles_a,
+                widths_a,
+                vol_ratio_a,
+                radial_2_a,
+                radial_3_a,
+                radial_4_a,
+            ) = MBIS_props_from_wfn(wfn_a)
+            population_a = MBIS_population(js.geometry[js.monAs], multipoles_a)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_a)
 
             sub_job = "MBIS_monB"
             psi4.geometry(geom_B)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_b, wfn_b = psi4.energy(l, return_wfn=True)
-            wfn_b, multipoles_b, widths_b, vol_ratio_b, *radial = MBIS_props_from_wfn(wfn_b)
+            (
+                wfn_b,
+                multipoles_b,
+                widths_b,
+                vol_ratio_b,
+                radial_2_b,
+                radial_3_b,
+                radial_4_b,
+            ) = MBIS_props_from_wfn(wfn_b)
+            population_b = MBIS_population(js.geometry[js.monBs], multipoles_b)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_b)
             es.append(multipoles_d)
             es.append(multipoles_a)
@@ -1272,14 +1306,27 @@ def run_MBIS(js: jobspec.sapt0_js, print_energies=False) -> np.array:
             es.append(vol_ratio_d)
             es.append(vol_ratio_a)
             es.append(vol_ratio_b)
+            es.append(radial_2_d)
+            es.append(radial_2_a)
+            es.append(radial_2_b)
+            es.append(radial_3_d)
+            es.append(radial_3_a)
+            es.append(radial_3_b)
+            es.append(radial_4_d)
+            es.append(radial_4_a)
+            es.append(radial_4_b)
+            es.append(population_d)
+            es.append(population_a)
+            es.append(population_b)
 
         except Exception as e:
             print("Exception:", e)
             out_energies = None
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            for i in range(9):
+            for i in range(21):
                 es.append(None)
     return es
+
 
 def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -1295,7 +1342,15 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
             mol_d = psi4.geometry(geom)
             handle_hrcl_extra_info_options(js, l, sub_job)
             e_d, wfn_d = psi4.energy(l, return_wfn=True)
-            wfn_d, multipoles_d, widths_d, vol_ratio_d, radial_2, radal_3, radial_4 = MBIS_props_from_wfn(wfn_d)
+            (
+                wfn_d,
+                multipoles_d,
+                widths_d,
+                vol_ratio_d,
+                radial_2,
+                radal_3,
+                radial_4,
+            ) = MBIS_props_from_wfn(wfn_d)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
 
             es.append(multipoles_d)
@@ -1312,6 +1367,7 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
             for i in range(3):
                 es.append(None)
     return es
+
 
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -1331,6 +1387,7 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
             print("Exception:", e)
         handle_hrcl_psi4_cleanup(js, l, sub_job)
     return ie
+
 
 def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
     """ """
@@ -1377,7 +1434,8 @@ def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
         for k, v in js.extra_info["options"].items():
             opts += f"{k} {v}\n"
         with open(f"{job_dir}/psi4.in", "w") as f:
-            f.write(f"""
+            f.write(
+                f"""
 import json
 import numpy as np
 
@@ -1404,5 +1462,6 @@ with open("vars.json", "w") as f:
      json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
      f.write(json_dump)
 
-        """)
+        """
+            )
     return [None for i in range(len(js.extra_info["level_theory"]))]
