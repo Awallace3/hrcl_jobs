@@ -942,10 +942,11 @@ def create_update_table(
     the table_cols schema
     """
 
-    table_exists = new_table(db_path, table_name, table_cols)
+    table_not_exists = new_table(db_path, table_name, table_cols)
     con, cur = establish_connection(db_path)
     table_add_columns(con, table_name, table_cols)
-    if table_exists:
+    print("table exists", table_not_exists)
+    if table_not_exists:
         if len(data) > 0:
             print("Updating Table...")
             insertion, vals = [], []
@@ -963,6 +964,26 @@ def create_update_table(
                 insert_new_row(cur, con, table_name, insertion, r)
                 cnt += 1
             print(f"Inserted {cnt} rows into {table_name}")
+    elif len(data) > 0:
+        ids = return_id_list_full_table(cur, table_name, "id")
+        print(ids)
+        for k, v in data.items():
+            if k not in table_cols.keys():
+                print(f"ERROR: {k} not in {table_name} columns")
+                return False
+            else:
+                print(f"Updating {k}...")
+                for i, j in zip(ids, v):
+                    print(k, i, j)
+                    update_by_id(
+                        con,
+                        cur,
+                        output=[j],
+                        id_value=i,
+                        id_label="id",
+                        table=table_name,
+                        output_columns=[k],
+                    )
     return True
 
 
@@ -973,7 +994,7 @@ def collect_ids_for_parallel(
     sort_column: str = "Geometry",
     matches: dict = {"SAPT0_adz": "NULL"},
     id_value: str = "id",
-    joiner: str ="AND",
+    joiner: str = "AND",
     ascending: bool = True,
 ) -> []:
     """

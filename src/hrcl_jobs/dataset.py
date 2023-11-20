@@ -117,7 +117,7 @@ def compute_MBIS(
         num_omp_threads = hive_params["num_omp_threads"]
     method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
     basis = col_check.split("_")[-1]
-    table_cols={
+    table_cols = {
         f"MBIS_{method}_multipoles_d_{basis}": "FLOAT",
         f"MBIS_{method}_multipoles_a_{basis}": "FLOAT",
         f"MBIS_{method}_multipoles_b_{basis}": "FLOAT",
@@ -141,6 +141,7 @@ def compute_MBIS(
         f"MBIS_{method}_populations_b_{basis}": "array",
     }
     from mpi4py import MPI
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
@@ -197,6 +198,7 @@ def compute_MBIS(
     )
     return
 
+
 def compute_MBIS_atom(
     DB_NAME,
     TABLE_NAME,
@@ -214,16 +216,18 @@ def compute_MBIS_atom(
         num_omp_threads = hive_params["num_omp_threads"]
     method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
     basis = col_check.split("_")[-1]
-    table_cols={
+    table_cols = {
         f"MBIS_{method}_multipoles_{basis}": "FLOAT",
         f"MBIS_{method}_widths_{basis}": "array",
         f"MBIS_{method}_vol_ratio_{basis}": "array",
         f"MBIS_{method}_radial_2_{basis}": "array",
         f"MBIS_{method}_radial_3_{basis}": "array",
         f"MBIS_{method}_radial_4_{basis}": "array",
+        f"MBIS_{method}_populations_{basis}": "array",
     }
     col_check_MBIS = f"MBIS_{method}_radial_2_{basis}"
     from mpi4py import MPI
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
@@ -272,6 +276,90 @@ def compute_MBIS_atom(
         headers_sql=hrcl_psi4.jobspec.monomer_js_headers(),
         run_js_job=hrcl_psi4.psi4_inps.run_MBIS_monomer,
         extra_info=xtra_mbis,
+        ppm=memory_per_thread,
+        id_label="id",
+        output_columns=table_cols.keys(),
+        print_insertion=True,
+    )
+    return
+
+
+def compute_energy(
+    DB_NAME,
+    TABLE_NAME,
+    col_check="SAPT0_adz",
+    hex=True,
+    hive_params=HIVE_PARAMS,
+    TESTING=False,
+    options=None,
+    xtra=None,
+) -> None:
+    if hex:
+        machine = machine_list_resources()
+        memory_per_thread = f"{machine.memory_per_thread} gb"
+        num_omp_threads = machine.omp_threads
+    else:
+        memory_per_thread = hive_params["mem_per_process"]
+        num_omp_threads = hive_params["num_omp_threads"]
+    method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
+    js_obj, js_headers, run_js_job = hrcl_psi4.get_parallel_functions(method)
+    basis = col_check.split("_")[-1]
+    col_check = f"{method}_{basis}"
+    table_cols = {
+        f"{method}_{basis}": "array",
+    }
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    print(f"{rank = } {memory_per_thread = } ")
+    if rank == 0:
+        sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
+    if hex:
+        machine = machine_list_resources()
+        memory_per_thread = f"{machine.memory_per_thread} gb"
+        num_omp_threads = machine.omp_threads
+    else:
+        memory_per_thread = hive_params["mem_per_process"]
+        num_omp_threads = hive_params["num_omp_threads"]
+
+    con, cur = sqlt.establish_connection(DB_NAME)
+    mbis_ids = sqlt.collect_ids_for_parallel(
+        DB_NAME,
+        TABLE_NAME,
+        col_check=[col_check, "array"],
+        matches={
+            col_check: ["NULL"],
+        },
+        ascending=not TESTING,
+        sort_column="Geometry",
+    )
+    if options is None:
+        options = {
+            "basis": basis_str,
+            "E_CONVERGENCE": 8,
+            "D_CONVERGENCE": 8,
+        }
+    print(f"{options = }")
+    if xtra is None:
+        xtra= {
+            "options": options,
+            "num_threads": num_omp_threads,
+            "level_theory": [f"{method}/{basis_str}"],
+            "out": {
+                "path": "schr",
+                "version": "1",
+            },
+        }
+    print(f"{xtra = }")
+    parallel.ms_sl_extra_info(
+        id_list=mbis_ids,
+        db_path=DB_NAME,
+        table_name=TABLE_NAME,
+        js_obj=js_obj,
+        headers_sql=js_headers(),
+        run_js_job=run_js_job,
+        extra_info=xtra,
         ppm=memory_per_thread,
         id_label="id",
         output_columns=table_cols.keys(),
