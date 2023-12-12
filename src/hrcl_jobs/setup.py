@@ -13,7 +13,6 @@ from .sqlt import (
 )
 from qm_tools_aw.tools import np_carts_to_string, string_carts_to_np
 
-from mpi4py import MPI
 import numpy as np
 from .s22 import s22_testing
 

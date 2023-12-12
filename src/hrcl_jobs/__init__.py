@@ -1,7 +1,12 @@
-from . import serial
-from . import parallel
+import warnings
 from . import sqlt
+from . import serial
 from . import jobspec
-from . import setup
-from . import examples
-from . import dataset
+try:
+    from . import parallel
+    from . import setup
+    from . import examples
+    from . import dataset 
+except ImportError:
+    warnings.warn("WARNING: Could not import all modules from hrcl_jobs. Need to install mpi4py for parallelization")
+    pass
