@@ -1059,18 +1059,20 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     generate_outputs = "out" in js.extra_info.keys()
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
-        with open(f"{job_dir}/{sub_job}_vars.json", "w") as f:
-            out = psi4.core.variables()
-            if wfn is not None:
-                tmp = {}
-                for k, v in wfn.variables().items():
-                    if isinstance(v, psi4.core.Matrix):
-                        tmp[k] = v.to_array(dense=True)
-                    else:
-                        tmp[k] = v
-                out["wfn"] = tmp
-            json_dump = json.dumps(out, indent=4, cls=NumpyEncoder)
-            f.write(json_dump)
+        out_json = f"{job_dir}/{sub_job}_vars.json"
+        if os.path.exists(out_json):
+            with open(out_json, "w") as f:
+                out = psi4.core.variables()
+                if wfn is not None:
+                    tmp = {}
+                    for k, v in wfn.variables().items():
+                        if isinstance(v, psi4.core.Matrix):
+                            tmp[k] = v.to_array(dense=True)
+                        else:
+                            tmp[k] = v
+                    out["wfn"] = tmp
+                json_dump = json.dumps(out, indent=4, cls=NumpyEncoder)
+                f.write(json_dump)
 
     if psi4_clean_all:
         psi4.core.clean_options()
@@ -1351,6 +1353,7 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
                 radal_3,
                 radial_4,
             ) = MBIS_props_from_wfn(wfn_d)
+            population = MBIS_population(js.geometry, multipoles_d)
             handle_hrcl_psi4_cleanup(js, l, sub_job, wfn=wfn_d)
 
             es.append(multipoles_d)
@@ -1359,12 +1362,13 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
             es.append(radial_2)
             es.append(radal_3)
             es.append(radial_4)
+            es.append(population)
 
         except Exception as e:
             print("Exception:", e)
             out_energies = None
             handle_hrcl_psi4_cleanup(js, l, sub_job)
-            for i in range(3):
+            for i in range(7):
                 es.append(None)
     return es
 

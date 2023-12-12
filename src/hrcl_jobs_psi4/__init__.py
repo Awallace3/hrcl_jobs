@@ -11,3 +11,9 @@ def get_level_of_theory(level_of_theory_name: str):
     method = methods.get_methods(method)
     return method, basis
 
+def get_parallel_functions(method):
+    if method == "SAPT0":
+        return jobspec.sapt0_js, jobspec.sapt0_js_headers, psi4_inps.run_sapt0_components
+    else:
+        print(f"Method {method} not implemented yet!")
+        sys.exit(1)
