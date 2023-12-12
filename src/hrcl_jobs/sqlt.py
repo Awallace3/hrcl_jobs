@@ -843,6 +843,9 @@ def table_to_df_pkl(
     """
     table_to_df_pkl
     """
+    print(f"db_p: {db_p}")
+    print(f"df_p: {df_p}")
+    print(f"table: {table}")
     con, cur = establish_connection(db_p)
     if id_list:
         cmd = f"""SELECT * FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
