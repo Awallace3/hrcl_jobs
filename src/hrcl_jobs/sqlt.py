@@ -282,11 +282,11 @@ def convert_df_into_sql(
 
     for k, v in output_columns.items():
         if v.lower() == "float":
-            df[k] = [float(0) for i in range(len(df))]
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "array":
-            df[k] = [np.zeros(2) for i in range(len(df))]
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "text":
-            df[k] = ["" for i in range(len(df))]
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "integer primary key":
             df[k] = [i for i in range(len(df))]
         else:
