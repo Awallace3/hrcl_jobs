@@ -281,7 +281,7 @@ def convert_df_into_sql(
     print(input_columns)
 
     for k, v in output_columns.items():
-        if v.lower() == "float":
+        if v.lower() == "float" or v.lower() == "real" or v.lower() == "integer":
             df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "array":
             df[k] = [pd.NA for i in range(len(df))]

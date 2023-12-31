@@ -14,14 +14,16 @@ class example_js:
     extra_info: {}
     mem: str
 
+
 @dataclass
 class vina_js:
     id_label: int
-    PRO_PDB: str 
+    PRO_PDB: str
     LIG_PDB: str
     WAT_PDB: str
     OTH_PDB: str
     extra_info: {}
+
 
 def vina_js_headers():
     return [
@@ -31,3 +33,25 @@ def vina_js_headers():
         "WAT_PDB",
         "OTH_PDB",
     ]
+
+
+@dataclass
+class apnet_disco_js:
+    id_label: int
+    PRO_PDB: str
+    LIG_PDB: str
+    WAT_PDB: str
+    OTH_PDB: str
+    extra_info: {}
+    mem: str
+
+
+def apnet_disco_js_headers():
+    return [
+        "id",
+        "PRO_PDB",
+        "LIG_PDB",
+        "WAT_PDB",
+        "OTH_PDB",
+    ]
+
