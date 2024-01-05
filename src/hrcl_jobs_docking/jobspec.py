@@ -55,3 +55,23 @@ def apnet_disco_js_headers():
         "OTH_PDB",
     ]
 
+@dataclass
+class autodock_vina_disco_js:
+    id_label: int
+    PRO_PDB: str
+    LIG_PDB: str
+    WAT_PDB: str
+    OTH_PDB: str
+    extra_info: {}
+    mem: str
+
+
+def autodock_vina_disco_js_headers():
+    return [
+        "id",
+        "PRO_PDB",
+        "LIG_PDB",
+        "WAT_PDB",
+        "OTH_PDB",
+    ]
+

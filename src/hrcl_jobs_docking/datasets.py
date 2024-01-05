@@ -78,7 +78,7 @@ def apnet_disco_dataset(
 def vina_api_disco_dataset(
     db_path,
     table_name,
-    col_check="apnet_totl_LIG",
+    col_check="vina_total_LIG",
     assay="KI",
     hex=False,
     check_apnet_errors=False,
@@ -101,35 +101,44 @@ def vina_api_disco_dataset(
     print(f"{rank = } {memory_per_thread = } ")
 
     output_columns = [col_check]
-    suffix = col_check.split("_")[1:]
-    for i in ["apnet_elst", "apnet_exch", "apnet_indu", "apnet_disp"]:
+    suffix = col_check.split("__")[1:]
+    for i in [
+        f"{scoring_function}_inter",
+        f"{scoring_function}_intra",
+        f"{scoring_function}_torsion",
+        f"{scoring_function}_best_pose",
+        f"{scoring_function}_poses_pdbqt",
+        f"{scoring_function}_all_poses",
+        f"{scoring_function}_errors",
+          ]:
         output_columns.append(i + "_" + "_".join(suffix))
-    output_columns.append("apnet_errors")
     print(output_columns)
 
     matches = {
         col_check: ["NULL"],
         "Assay": [assay],
     }
+
     if check_apnet_errors:
-        matches["apnet_errors"] = ["NULL"]
+        matches[f"{scoring_function}_errors_{suffix}"] = ["NULL"]
 
     con, cur = hrcl.sqlt.establish_connection(db_path)
     query = hrcl.sqlt.query_columns_for_values(
         cur,
         table_name,
-        # id_names=["id", "PRO_PDB", "LIG_PDB", "WAT_PDB", "OTH_PDB"],
         id_names=["id"],
         matches=matches,
     )
+
+    extra_info['scoring_function'] = scoring_function
     # query = [7916 ]
 
     hrcl.parallel.ms_sl_extra_info(
         id_list=query,
         db_path=db_path,
         table_name=table_name,
-        js_obj=jobspec.apnet_disco_js,
-        headers_sql=jobspec.apnet_disco_js_headers(),
+        js_obj=jobspec.autodock_vina_disco_js,
+        headers_sql=jobspec.autodock_vina_disco_js_headers(),
         run_js_job=docking_inps.run_apnet_discos,
         extra_info=extra_info,
         ppm=memory_per_thread,

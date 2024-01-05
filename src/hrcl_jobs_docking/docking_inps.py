@@ -202,3 +202,31 @@ def run_vina_simple(js: jobspec.vina_js) -> []:
     v.write_poses(vina_out, n_poses=10, overwrite=True)
     return [energy]
 
+
+# TODO: Update this function to return data as a list in the following order (and typing) 
+        # "vina_total__LIG": "REAL",
+        # "vina_inter__LIG": "REAL",
+        # "vina_intra__LIG": "REAL",
+        # "vina_torsion__LIG": "REAL",
+        # "vina_intra_best_pose__LIG": "REAL",
+        # "vina_poses_pdbqt__LIG": "TEXT",
+        # "vina_all_poses__LIG": "array",
+        # "vina_errors__LIG": "TEXT",
+def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
+    """
+    User must provide the following in js.extra_info:
+    - sf_name: str
+    - setup_python_files_path: str
+    where sf_name is the name of the scoring function ['vina', 'ad4'] and
+    setup_python_files_path is path to ligand_preparation.py and
+    receptor_preparation.py
+    """
+    sf = js.extra_info["scoring_function"]
+    v = Vina(sf_name=sf)
+    PRO_PDBQT = js.PRO_PDB + "qt"
+    LIG_PDBQT = js.LIG_PDB + "qt"
+    WAT_PDBQT = js.WAT_PDB + "qt"
+    OTH_PDBQT = js.OTH_PDB + "qt"
+
+    # TODO: Add logic for running autodock-vina, return length 7
+    return []
