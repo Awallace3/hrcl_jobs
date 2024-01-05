@@ -104,8 +104,12 @@ def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
     # )
     try:
         pro_xyz, pro_cm = mda_selection_to_xyz_cm(
-            pro_universe.select_atoms("protein and altloc A")
+            pro_universe.select_atoms("protein and not altloc B")
         )
+        if len(pro_xyz[:, 0]) == 0:
+            pro_xyz, pro_cm = mda_selection_to_xyz_cm(
+                pro_universe.select_atoms("protein")
+            )
         lig_xyz, lig_cm = mda_selection_to_xyz_cm(
             lig_universe.select_atoms("not protein")
         )
@@ -119,6 +123,7 @@ def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
         lig_xyz[:, 0], lig_xyz[:, 1:], only_results=True
     )
     apnet_error = None
+    print(js.PRO_PDB, js.LIG_PDB, len(pro_xyz[:, 0]), len(lig_xyz[:, 0]), sep="\n")
     try:
         geom = f"{pro_cm[0]} {pro_cm[1]}\n{mon_a}--\n{lig_cm[0]} {lig_cm[1]}\n{mon_b}\nunits angstrom\n"
         mol = qcel.models.Molecule.from_data(geom)
@@ -132,7 +137,10 @@ def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
             apnet_error = e
             print(apnet_error)
             return [None, None, None, None, None, str(e)]
+    # prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
+    # print(prediction, uncertainty)
     try:
+        print(mol)
         prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
         print(prediction, uncertainty)
         prediction = prediction[0]
