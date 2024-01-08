@@ -1,4 +1,4 @@
-# Hierarchical Python Jobs
+# Hierarchical Python Jobs (hrcl_jobs)
 
 # Installation
 ```bash 
