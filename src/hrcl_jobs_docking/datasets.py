@@ -2,9 +2,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import hrcl_jobs as hrcl
-from mpi4py import MPI
-from . import jobspec
 from . import docking_inps
+from . import jobspec
 
 HIVE_PARAMS = {
     "mem_per_process": "60 gb",
@@ -24,9 +23,8 @@ def apnet_disco_dataset(
         "mem_per_process": "24 gb",
         "num_omp_threads": 4,
     },
+    parallel=True,
 ):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
     if hex:
         machine = hrcl.utils.machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
@@ -34,7 +32,11 @@ def apnet_disco_dataset(
     else:
         memory_per_thread = hive_params["mem_per_process"]
         num_omp_threads = hive_params["num_omp_threads"]
-    print(f"{rank = } {memory_per_thread = } ")
+    if parallel:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        print(f"{rank = } {memory_per_thread = } ")
 
     output_columns = [col_check]
     suffix = col_check.split("_")[1:]
@@ -91,8 +93,6 @@ def vina_api_disco_dataset(
     },
     parallel=True,
 ):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
     if hex:
         machine = hrcl.utils.machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
@@ -100,7 +100,11 @@ def vina_api_disco_dataset(
     else:
         memory_per_thread = hive_params["mem_per_process"]
         num_omp_threads = hive_params["num_omp_threads"]
-    print(f"{rank = } {memory_per_thread = } ")
+    if parallel:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        print(f"{rank = } {memory_per_thread = } ")
 
     output_columns = [col_check]
     suffix = col_check.split("__")[1:]

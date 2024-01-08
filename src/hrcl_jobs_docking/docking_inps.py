@@ -165,11 +165,11 @@ def get_com(pdbqt_file):
     com = u.atoms.center_of_mass().tolist()
     return com
 
-def prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename = LIG_PDBQT):
+def prepare_ligand4(ligand_filename, outputfilename):
     cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_ligand4.py -l ligand_filename -o outputfilename"
     out = subprocess.run(cmd, shell=True, check=True)
 
-def prepare_receptor4(receptor_filename = js.PRO_PDB,outputfilename = PRO_PDBQT): 
+def prepare_receptor4(receptor_filename, outputfilename): 
     cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_receptor4.py -r receptor_filename -o outputfilename"
     out = subprocess.run(cmd, shell=True, check=True)
 def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
@@ -196,7 +196,7 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
             exhaustiveness = js.extra_info['exhaustiveness']
         else:
             exhaustiveness = 32
-        if 'npts' is in js.extra_info.keys():
+        if 'npts' in js.extra_info.keys():
             npts = js.extra_info['npts']
         else:
             npts = [54,54,54]
@@ -217,7 +217,7 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         v.set_ligand_from_file(LIG_PDBQT)
         vina_errors = None
         #if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
-        if sf_name is in ['vina','vinardo']:
+        if sf_name in ['vina','vinardo']:
             v.set_receptor(PRO_PDBQT)
             v.compute_vina_maps(center=com, box_size=[20, 20, 20])
         elif sf_name =='ad4':
@@ -235,7 +235,7 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         energies = v.energies(n_poses=n_poses)
     except Exception as e:
         vina_errors = e
-    if vina_errors = None:
+    if vina_errors == None:
         return [energies[0][0], energies[0][1], energies[0][2],energies[0][3],energies[0][4], vina_out, energies, vina_errors]
     else:
         return [None, None, None, None, None, None, None, vina_errors]
