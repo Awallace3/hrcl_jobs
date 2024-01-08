@@ -162,56 +162,16 @@ def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
 
 def get_com(pdbqt_file):
     u = mda.Universe(pdbqt_file)
-    com = u.atoms.center_of_mass()
+    com = u.atoms.center_of_mass().tolist()
     return com
 
+def prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename = LIG_PDBQT):
+    cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_ligand4.py -l ligand_filename -o outputfilename"
+    out = subprocess.run(cmd, shell=True, check=True)
 
-def run_vina_simple(js: jobspec.vina_js) -> []:
-    """
-    User must provide the following in js.extra_info:
-    - sf_name: str
-    - setup_python_files_path: str
-    where sf_name is the name of the scoring function ['vina', 'ad4'] and
-    setup_python_files_path is path to ligand_preparation.py and
-    receptor_preparation.py
-    """
-    js.extra_info["setup_python_files_path"]
-    v = Vina(sf_name=js.extra_info["sf_name"])
-    PRO_PDBQT = js.PRO_PDB + "qt"
-    LIG_PDBQT = js.LIG_PDB + "qt"
-    WAT_PDBQT = js.WAT_PDB + "qt"
-    OTH_PDBQT = js.OTH_PDB + "qt"
-    v.set_receptor(PRO_PDBQT)
-    v.set_ligand_from_file(LIG_PDBQT)
-    com = get_com(js.LIG_PDB)
-    print(com)
-    v.compute_vina_maps(com, box_size=[20, 20, 20])
-
-    # Score the current pose
-    energy = v.score()
-    print("Score before minimization: %.3f (kcal/mol)" % energy[0])
-
-    # Minimized locally the current pose
-    energy_minimized = v.optimize()
-    print("Score after minimization : %.3f (kcal/mol)" % energy_minimized[0])
-    v.write_pose("ligand_minimized.pdbqt", overwrite=True)
-
-    # Dock the ligand
-    v.dock(exhaustiveness=32, n_poses=20)
-    vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
-    v.write_poses(vina_out, n_poses=10, overwrite=True)
-    return [energy]
-
-
-# TODO: Update this function to return data as a list in the following order (and typing) 
-        # "vina_total__LIG": "REAL",
-        # "vina_inter__LIG": "REAL",
-        # "vina_intra__LIG": "REAL",
-        # "vina_torsion__LIG": "REAL",
-        # "vina_intra_best_pose__LIG": "REAL",
-        # "vina_poses_pdbqt__LIG": "TEXT",
-        # "vina_all_poses__LIG": "array",
-        # "vina_errors__LIG": "TEXT",
+def prepare_receptor4(receptor_filename = js.PRO_PDB,outputfilename = PRO_PDBQT): 
+    cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_receptor4.py -r receptor_filename -o outputfilename"
+    out = subprocess.run(cmd, shell=True, check=True)
 def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     """
     User must provide the following in js.extra_info:
@@ -221,12 +181,71 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     setup_python_files_path is path to ligand_preparation.py and
     receptor_preparation.py
     """
-    sf = js.extra_info["scoring_function"]
-    v = Vina(sf_name=sf)
-    PRO_PDBQT = js.PRO_PDB + "qt"
-    LIG_PDBQT = js.LIG_PDB + "qt"
-    WAT_PDBQT = js.WAT_PDB + "qt"
-    OTH_PDBQT = js.OTH_PDB + "qt"
+    try:
+        from prepare_gpf import prepare_gpf
+        #from prepare_ligand4 import prepare_ligand4
+        #from prepare_receptor4 import prepare_receptor4
+        import subprocess
 
-    # TODO: Add logic for running autodock-vina, return length 7
-    return []
+        js.extra_info["setup_python_files_path"]
+        if 'n_poses' in js.extra_info.keys():
+            n_poses = js.extra_info['n_poses']
+        else:
+            n_poses = 10
+        if 'exhaustiveness' in js.extra_info.keys():
+            exhaustiveness = js.extra_info['exhaustiveness']
+        else:
+            exhaustiveness = 32
+        if 'npts' is in js.extra_info.keys():
+            npts = js.extra_info['npts']
+        else:
+            npts = [54,54,54]
+        npts_param = f'npts={npts[0]},{npts[1]},{npts[2]}'
+        sf_name = js.extra_info["sf_name"]
+        v = Vina(sf_name=sf_name)
+        PRO_PDBQT = js.PRO_PDB + "qt"
+        LIG_PDBQT = js.LIG_PDB + "qt"
+        WAT_PDBQT = js.WAT_PDB + "qt"
+        OTH_PDBQT = js.OTH_PDB + "qt"
+        PRO = PRO_PDBQT.replace(".pdbqt", "")
+        #prepare receptor and ligand into pdbqt files from pdb files   
+        prepare_receptor4(receptor_filename = js.PRO_PDB,outputfilename = PRO_PDBQT)
+        prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename = LIG_PDBQT)
+        #find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
+        com = get_com(js.LIG_PDB)
+        #set the ligand
+        v.set_ligand_from_file(LIG_PDBQT)
+        vina_errors = None
+        #if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
+        if sf_name is in ['vina','vinardo']:
+            v.set_receptor(PRO_PDBQT)
+            v.compute_vina_maps(center=com, box_size=[20, 20, 20])
+        elif sf_name =='ad4':
+            prepare_gpf(ligand_filename=ligand_pdbqt,receptor_filename=receptor_pdbqt,parameters=[npts_params])
+            cmd = f"autogrid4 -p receptor.gpf -l receptor.glg"
+            out = subprocess.run(cmd, shell=True, check=True)
+            v.load_maps(PRO)
+        else: 
+            vina_errors='invalid sf_name'
+            
+        #docking
+        v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
+        vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
+        v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
+        energies = v.energies(n_poses=n_poses)
+    except Exception as e:
+        vina_errors = e
+    if vina_errors = None:
+        return [energies[0][0], energies[0][1], energies[0][2],energies[0][3],energies[0][4], vina_out, energies, vina_errors]
+    else:
+        return [None, None, None, None, None, None, None, vina_errors]
+
+#return data as a list in the following order (and typing) 
+        # "vina_total__LIG": "REAL",
+        # "vina_inter__LIG": "REAL",
+        # "vina_intra__LIG": "REAL",
+        # "vina_torsion__LIG": "REAL",
+        # "vina_intra_best_pose__LIG": "REAL",
+        # "vina_poses_pdbqt__LIG": "TEXT",
+        # "vina_all_poses__LIG": "array",
+        # "vina_errors__LIG": "TEXT",
