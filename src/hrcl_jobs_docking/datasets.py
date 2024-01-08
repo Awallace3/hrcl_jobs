@@ -86,7 +86,13 @@ def vina_api_disco_dataset(
     hex=False,
     check_apnet_errors=False,
     scoring_function="vina",
-    extra_info={},
+    extra_info={
+        "sf_params": {
+            "exhaustiveness": 32,
+            "n_poses": 10,
+            "npts": [54, 54, 54],
+        },
+    },
     hive_params={
         "mem_per_process": "24 gb",
         "num_omp_threads": 4,
@@ -136,7 +142,7 @@ def vina_api_disco_dataset(
         matches=matches,
     )
 
-    extra_info["scoring_function"] = scoring_function
+    extra_info["sf_name"] = scoring_function
     # query = [7916 ]
 
     if parallel:

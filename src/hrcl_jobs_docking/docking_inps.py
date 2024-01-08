@@ -195,17 +195,16 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         # from prepare_receptor4 import prepare_receptor4
         import subprocess
 
-        js.extra_info["setup_python_files_path"]
         if "n_poses" in js.extra_info.keys():
-            n_poses = js.extra_info["n_poses"]
+            n_poses = js.extra_info['sf_params']["n_poses"]
         else:
             n_poses = 10
         if "exhaustiveness" in js.extra_info.keys():
-            exhaustiveness = js.extra_info["exhaustiveness"]
+            exhaustiveness = js.extra_info['sf_params']["exhaustiveness"]
         else:
             exhaustiveness = 32
         if "npts" in js.extra_info.keys():
-            npts = js.extra_info["npts"]
+            npts = js.extra_info['sf_params']["npts"]
         else:
             npts = [54, 54, 54]
         npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
