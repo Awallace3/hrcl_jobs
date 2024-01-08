@@ -81,7 +81,7 @@ def apnet_disco_dataset(
 def vina_api_disco_dataset(
     db_path,
     table_name,
-    col_check="vina_total_LIG",
+    col_check="vina_total__LIG",
     assay="KI",
     hex=False,
     check_apnet_errors=False,
@@ -149,7 +149,7 @@ def vina_api_disco_dataset(
         table_name=table_name,
         js_obj=jobspec.autodock_vina_disco_js,
         headers_sql=jobspec.autodock_vina_disco_js_headers(),
-        run_js_job=docking_inps.run_apnet_discos,
+        run_js_job=docking_inps.run_autodock_vina,
         extra_info=extra_info,
         ppm=memory_per_thread,
         id_label="id",

@@ -63,14 +63,14 @@ def ms_sl_extra_info(
             dataclass_obj=js_obj,
             id_value=active_ind,
             id_label=id_label,
-            table=table,
+            table=table_name,
         )
         output = run_js_job(js)
         update_func(
             con,
             cur,
             output,
-            id_value=id_value,
+            id_value=active_ind,
             id_label=id_label,
             table=table_name,
             output_columns=output_columns,

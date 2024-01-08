@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from . import jobspec
 from qcelemental import constants
 import json
-import qm_tools_aw 
+import qm_tools_aw
 import qcelemental as qcel
 from pprint import pprint as pp
 import MDAnalysis as mda
@@ -16,12 +16,12 @@ from MDAnalysis.exceptions import NoDataError
 # docking specific imports
 from vina import Vina
 
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-
 
 
 def mda_selection_to_xyz_cm(
@@ -41,7 +41,9 @@ def mda_selection_to_xyz_cm(
         print("setting charge to 0")
         pass
 
-    cm = np.array([selection_charge, multiplicity], dtype=np.int32) # TODO: make multiplicity a variable
+    cm = np.array(
+        [selection_charge, multiplicity], dtype=np.int32
+    )  # TODO: make multiplicity a variable
     selection_elements = [qcel.periodictable.to_Z(i) for i in selection_elements]
     g = np.concatenate((np.reshape(selection_elements, (-1, 1)), selection_xyz), axis=1)
     return g, cm
@@ -90,6 +92,7 @@ def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
         - apnet_errors: str
     """
     import apnet
+
     pro_universe = mda.Universe(js.PRO_PDB)
     lig_universe = mda.Universe(js.LIG_PDB)
     # if wat_pdb is not None:
@@ -165,13 +168,17 @@ def get_com(pdbqt_file):
     com = u.atoms.center_of_mass().tolist()
     return com
 
+
 def prepare_ligand4(ligand_filename, outputfilename):
     cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_ligand4.py -l ligand_filename -o outputfilename"
     out = subprocess.run(cmd, shell=True, check=True)
 
-def prepare_receptor4(receptor_filename, outputfilename): 
+
+def prepare_receptor4(receptor_filename, outputfilename):
     cmd = f"python3 ~/data/gits/apnet_docking/docking_practice/MGLToolsPckgsPy3/prepare_receptor4.py -r receptor_filename -o outputfilename"
     out = subprocess.run(cmd, shell=True, check=True)
+
+
 def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     """
     User must provide the following in js.extra_info:
@@ -183,24 +190,25 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     """
     try:
         from prepare_gpf import prepare_gpf
-        #from prepare_ligand4 import prepare_ligand4
-        #from prepare_receptor4 import prepare_receptor4
+
+        # from prepare_ligand4 import prepare_ligand4
+        # from prepare_receptor4 import prepare_receptor4
         import subprocess
 
         js.extra_info["setup_python_files_path"]
-        if 'n_poses' in js.extra_info.keys():
-            n_poses = js.extra_info['n_poses']
+        if "n_poses" in js.extra_info.keys():
+            n_poses = js.extra_info["n_poses"]
         else:
             n_poses = 10
-        if 'exhaustiveness' in js.extra_info.keys():
-            exhaustiveness = js.extra_info['exhaustiveness']
+        if "exhaustiveness" in js.extra_info.keys():
+            exhaustiveness = js.extra_info["exhaustiveness"]
         else:
             exhaustiveness = 32
-        if 'npts' in js.extra_info.keys():
-            npts = js.extra_info['npts']
+        if "npts" in js.extra_info.keys():
+            npts = js.extra_info["npts"]
         else:
-            npts = [54,54,54]
-        npts_param = f'npts={npts[0]},{npts[1]},{npts[2]}'
+            npts = [54, 54, 54]
+        npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
         sf_name = js.extra_info["sf_name"]
         v = Vina(sf_name=sf_name)
         PRO_PDBQT = js.PRO_PDB + "qt"
@@ -208,27 +216,31 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         WAT_PDBQT = js.WAT_PDB + "qt"
         OTH_PDBQT = js.OTH_PDB + "qt"
         PRO = PRO_PDBQT.replace(".pdbqt", "")
-        #prepare receptor and ligand into pdbqt files from pdb files   
-        prepare_receptor4(receptor_filename = js.PRO_PDB,outputfilename = PRO_PDBQT)
-        prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename = LIG_PDBQT)
-        #find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
+        # prepare receptor and ligand into pdbqt files from pdb files
+        prepare_receptor4(receptor_filename=js.PRO_PDB, outputfilename=PRO_PDBQT)
+        prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename=LIG_PDBQT)
+        # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
         com = get_com(js.LIG_PDB)
-        #set the ligand
+        # set the ligand
         v.set_ligand_from_file(LIG_PDBQT)
         vina_errors = None
-        #if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
-        if sf_name in ['vina','vinardo']:
+        # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
+        if sf_name in ["vina", "vinardo"]:
             v.set_receptor(PRO_PDBQT)
             v.compute_vina_maps(center=com, box_size=[20, 20, 20])
-        elif sf_name =='ad4':
-            prepare_gpf(ligand_filename=ligand_pdbqt,receptor_filename=receptor_pdbqt,parameters=[npts_params])
+        elif sf_name == "ad4":
+            prepare_gpf(
+                ligand_filename=ligand_pdbqt,
+                receptor_filename=receptor_pdbqt,
+                parameters=[npts_params],
+            )
             cmd = f"autogrid4 -p receptor.gpf -l receptor.glg"
             out = subprocess.run(cmd, shell=True, check=True)
             v.load_maps(PRO)
-        else: 
-            vina_errors='invalid sf_name'
-            
-        #docking
+        else:
+            vina_errors = "invalid sf_name"
+
+        # docking
         v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
         vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
         v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
@@ -236,16 +248,26 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     except Exception as e:
         vina_errors = e
     if vina_errors == None:
-        return [energies[0][0], energies[0][1], energies[0][2],energies[0][3],energies[0][4], vina_out, energies, vina_errors]
+        return [
+            energies[0][0],
+            energies[0][1],
+            energies[0][2],
+            energies[0][3],
+            energies[0][4],
+            vina_out,
+            energies,
+            vina_errors,
+        ]
     else:
         return [None, None, None, None, None, None, None, vina_errors]
 
-#return data as a list in the following order (and typing) 
-        # "vina_total__LIG": "REAL",
-        # "vina_inter__LIG": "REAL",
-        # "vina_intra__LIG": "REAL",
-        # "vina_torsion__LIG": "REAL",
-        # "vina_intra_best_pose__LIG": "REAL",
-        # "vina_poses_pdbqt__LIG": "TEXT",
-        # "vina_all_poses__LIG": "array",
-        # "vina_errors__LIG": "TEXT",
+
+# return data as a list in the following order (and typing)
+# "vina_total__LIG": "REAL",
+# "vina_inter__LIG": "REAL",
+# "vina_intra__LIG": "REAL",
+# "vina_torsion__LIG": "REAL",
+# "vina_intra_best_pose__LIG": "REAL",
+# "vina_poses_pdbqt__LIG": "TEXT",
+# "vina_all_poses__LIG": "array",
+# "vina_errors__LIG": "TEXT",
