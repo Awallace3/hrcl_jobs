@@ -6,6 +6,7 @@ try:
     from . import parallel
     from . import setup
     from . import examples
+    from . import utils
 except ImportError:
     warnings.warn("Could not import all modules from hrcl_jobs.parallel (install mpi4py)")
     pass
