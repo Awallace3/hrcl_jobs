@@ -75,6 +75,7 @@ def apnet_disco_dataset(
     )
     return
 
+
 def vina_api_disco_dataset(
     db_path,
     table_name,
@@ -88,6 +89,7 @@ def vina_api_disco_dataset(
         "mem_per_process": "24 gb",
         "num_omp_threads": 4,
     },
+    parallel=True,
 ):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -110,7 +112,7 @@ def vina_api_disco_dataset(
         f"{scoring_function}_poses_pdbqt",
         f"{scoring_function}_all_poses",
         f"{scoring_function}_errors",
-          ]:
+    ]:
         output_columns.append(i + "_" + "_".join(suffix))
     print(output_columns)
 
@@ -130,10 +132,14 @@ def vina_api_disco_dataset(
         matches=matches,
     )
 
-    extra_info['scoring_function'] = scoring_function
+    extra_info["scoring_function"] = scoring_function
     # query = [7916 ]
 
-    hrcl.parallel.ms_sl_extra_info(
+    if parallel:
+        mode = hrcl.parallel
+    else:
+        mode = hrcl.serial
+    mode.ms_sl_extra_info(
         id_list=query,
         db_path=db_path,
         table_name=table_name,
