@@ -144,6 +144,8 @@ def vina_api_disco_dataset(
 
     extra_info["sf_name"] = scoring_function
     # query = [7916 ]
+    query = [query[0]]
+    print(f"Total number of jobs: {len(query)}")
 
     if parallel:
         mode = hrcl.parallel
