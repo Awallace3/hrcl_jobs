@@ -434,16 +434,18 @@ def update_rows(
         "environment_multipole_A",
         "environment_multipole_B",
     ],
+    verbose=1,
 ) -> None:
     """
     update_mp_rows
     """
     headers = ",\n".join([f"{i} = ?" for i in output_columns])
-    print("headers", headers)
-    print("output", output)
-    print(
-        (*tuple(output), col_val),
-    )
+    if verbose:
+        print("headers", headers)
+        print("output", output)
+        print(
+            (*tuple(output), col_val),
+        )
     cmd = f"""
         UPDATE {table}
         SET
