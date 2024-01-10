@@ -188,23 +188,28 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     setup_python_files_path is path to ligand_preparation.py and
     receptor_preparation.py
     """
-    import docking_tools_amw 
+    import docking_tools_amw
+
     # try:
-        # from prepare_ligand4 import prepare_ligand4
-        # from prepare_receptor4 import prepare_receptor4
+    # from prepare_ligand4 import prepare_ligand4
+    # from prepare_receptor4 import prepare_receptor4
 
     if "n_poses" in js.extra_info.keys():
-        n_poses = js.extra_info['sf_params']["n_poses"]
+        n_poses = js.extra_info["sf_params"]["n_poses"]
     else:
         n_poses = 10
     if "exhaustiveness" in js.extra_info.keys():
-        exhaustiveness = js.extra_info['sf_params']["exhaustiveness"]
+        exhaustiveness = js.extra_info["sf_params"]["exhaustiveness"]
     else:
         exhaustiveness = 32
     if "npts" in js.extra_info.keys():
-        npts = js.extra_info['sf_params']["npts"]
+        npts = js.extra_info["sf_params"]["npts"]
     else:
         npts = [54, 54, 54]
+    if "box_size" in js.extra_info.keys():
+        box_size = js.extra_info["sf_params"]["box_size"]
+    else:
+        box_size = [30, 30, 30]
     npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
     sf_name = js.extra_info["sf_name"]
     v = Vina(sf_name=sf_name)
@@ -213,39 +218,53 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     WAT_PDBQT = js.WAT_PDB + "qt"
     OTH_PDBQT = js.OTH_PDB + "qt"
     PRO = PRO_PDBQT.replace(".pdbqt", "")
-    # prepare receptor and ligand into pdbqt files from pdb files
-    # prepare_receptor4(receptor_filename=js.PRO_PDB, outputfilename=PRO_PDBQT)
-    # prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename=LIG_PDBQT)
-    docking_tools_amw.prepare_receptor4.prepare_receptor4(receptor_filename=js.PRO_PDB, outputfilename=PRO_PDBQT)
-    prepare_ligand4(ligand_filename=js.LIG_PDB, outputfilename=LIG_PDBQT)
-    # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
-    com = get_com(js.LIG_PDB)
-    # set the ligand
-    v.set_ligand_from_file(LIG_PDBQT)
-    vina_errors = None
-    # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
-    if sf_name in ["vina", "vinardo"]:
-        v.set_receptor(PRO_PDBQT)
-        v.compute_vina_maps(center=com, box_size=[20, 20, 20])
-    elif sf_name == "ad4":
-        docking_tools_amw.prepare_gpf.prepare_gpf(
-            ligand_filename=ligand_pdbqt,
-            receptor_filename=receptor_pdbqt,
-            parameters=[npts_params],
+    try:
+        docking_tools_amw.prepare_receptor4.prepare_receptor4(
+            receptor_filename=js.PRO_PDB,
+            outputfilename=PRO_PDBQT,
+            # charges_to_add=None,
         )
-        cmd = f"autogrid4 -p receptor.gpf -l receptor.glg"
-        out = subprocess.run(cmd, shell=True, check=True)
-        v.load_maps(PRO)
-    else:
-        vina_errors = "invalid sf_name"
+        print(js.LIG_PDB)
+        print(LIG_PDBQT)
+        print(js.PRO_PDB)
+        print(PRO_PDBQT)
+        docking_tools_amw.prepare_ligand4.prepare_ligand4(
+            ligand_filename=js.LIG_PDB,
+            outputfilename=LIG_PDBQT,
+            repairs="hydrogen",
+            # charges_to_add=None,
+        )
+        # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
+        com = get_com(js.LIG_PDB)
+        print(f"Center of Mass: {com}")
+        # set the ligand
+        vina_errors = None
+        # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
+        # NOTE: receptor must be set before ligand
+        if sf_name in ["vina", "vinardo"]:
+            print(sf_name)
+            v.set_receptor(PRO_PDBQT)
+            v.compute_vina_maps(center=com, box_size=box_size)
+        elif sf_name == "ad4":
+            docking_tools_amw.prepare_gpf.prepare_gpf(
+                ligand_filename=ligand_pdbqt,
+                receptor_filename=receptor_pdbqt,
+                parameters=[npts_params],
+            )
+            cmd = f"autogrid4 -p receptor.gpf -l receptor.glg"
+            out = subprocess.run(cmd, shell=True, check=True)
+            v.load_maps(PRO)
+        else:
+            vina_errors = "invalid sf_name"
+        v.set_ligand_from_file(LIG_PDBQT)
 
-    # docking
-    v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
-    vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
-    v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
-    energies = v.energies(n_poses=n_poses)
-    # except Exception as e:
-    #     vina_errors = e
+        # docking
+        v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
+        vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
+        v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
+        energies = v.energies(n_poses=n_poses)
+    except Exception as e:
+        vina_errors = e
     if vina_errors == None:
         return [
             energies[0][0],
@@ -259,8 +278,6 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         ]
     else:
         return [None, None, None, None, None, None, None, vina_errors]
-
-
 # return data as a list in the following order (and typing)
 # "vina_total__LIG": "REAL",
 # "vina_inter__LIG": "REAL",
