@@ -1,3 +1,6 @@
 from . import jobspec
 from . import docking_inps
-from . import datasets
+try:
+    from . import datasets
+except ImportError:
+    pass

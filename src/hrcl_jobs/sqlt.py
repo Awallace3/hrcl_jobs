@@ -225,14 +225,27 @@ def subset_df(index_split=range(10000, 10050)):
     return
 
 
-def update_column_value(con, cur, table_name, column_name, value):
+def update_column_value(
+    con,
+    cur,
+    table_name,
+    column_name,
+    value,
+    matches={},
+    joiner="AND",
+    verbose=1,
+):
     """
     update_column_value
     """
+    cmd = f"UPDATE {table_name} SET {column_name} = {value}"
+    cmd = handle_sql_matches(matches, cmd)
+    if verbose:
+        print(cmd)
     try:
-        cur.execute(f"UPDATE {table_name} SET {column_name} = {value}")
+        cur.execute(cmd)
         con.commit()
-    except e:
+    except (Exception) as e:
         print(e)
         return False
     return True
@@ -422,8 +435,8 @@ def update_by_id(
 def update_rows(
     conn,
     cursor,
-    output,
-    col_val,
+    output: list,
+    col_val: int,  # could be string as well
     col_match="rowid",
     table="main",
     output_columns=[
@@ -440,12 +453,6 @@ def update_rows(
     update_mp_rows
     """
     headers = ",\n".join([f"{i} = ?" for i in output_columns])
-    if verbose:
-        print("headers", headers)
-        print("output", output)
-        print(
-            (*tuple(output), col_val),
-        )
     cmd = f"""
         UPDATE {table}
         SET
@@ -453,6 +460,14 @@ def update_rows(
         WHERE
             {col_match}=?;
     """
+    if verbose:
+        print("headers", headers)
+        print("output", output)
+        print(
+            (*tuple(output), col_val),
+        )
+        print(cmd)
+
     cursor.execute(
         cmd,
         (*tuple(output), col_val),
@@ -574,6 +589,28 @@ def query_clean_match(m):
     return m
 
 
+def handle_sql_matches(matches, sql_cmd, joiner="AND"):
+    if len(matches) > 0:
+        where_match = []
+        for k, v in matches.items():
+            v = query_clean_match(v)
+            if len(v) == 1:
+                if v[0] == '"NULL"':
+                    m = f"{k} IS NULL"
+                elif v[0] == '"NOT NULL"':
+                    m = f"{k} IS NOT NULL"
+                elif type(v[0]) == str and "!" in v[0]:
+                    m = f"{k} NOT LIKE '{v[0][2:-1]}'"
+                else:
+                    m = f"{k}=={v[0]}"
+            else:
+                m = f"{k} IN {tuple(v)}"
+            where_match.append(m)
+        wm = f" {joiner} ".join(where_match)
+        sql_cmd = f"""{sql_cmd} WHERE {wm};"""
+    return sql_cmd
+
+
 def sqlt_execute(
     cur,
     table_name,
@@ -588,6 +625,7 @@ def sqlt_execute(
     """
     return_id_list queries db for matches with column and returns id
     """
+    conn = cur.connection
     if type(cols) == str:
         cols = cols
     else:
@@ -607,7 +645,11 @@ def sqlt_execute(
                 else:
                     m = f"{k}=={v[0]}"
             else:
-                m = f"{k} IN {tuple(v)}"
+                if type(v[0]) == str:
+                    v = ", ".join([f"'{i[1:-1]}'" for i in v])
+                    m = f"{k} IN ({v})"
+                else:
+                    m = f"{k} IN {tuple(v)}"
 
             where_match.append(m)
         wm = f" {joiner} ".join(where_match)

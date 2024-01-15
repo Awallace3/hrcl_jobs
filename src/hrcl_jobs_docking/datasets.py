@@ -15,7 +15,7 @@ def apnet_disco_dataset(
     db_path,
     table_name,
     col_check="apnet_totl_LIG",
-    assay="KI",
+    assay="KD",
     hex=False,
     check_apnet_errors=False,
     extra_info={},
@@ -99,6 +99,7 @@ def vina_api_disco_dataset(
     },
     parallel=True,
 ):
+    print("Starting vina docking...")
     if hex:
         machine = hrcl.utils.machine_list_resources()
         memory_per_thread = f"{machine.memory_per_thread} gb"
@@ -143,15 +144,15 @@ def vina_api_disco_dataset(
     )
 
     extra_info["sf_name"] = scoring_function
-    # query = [7916 ]
+    query = [7916 ]
     # print(query)
     # query = [query[0]]
     print(f"Total number of jobs: {len(query)}")
 
-    if parallel:
-        mode = hrcl.parallel
-    else:
+    if not parallel:
         mode = hrcl.serial
+    else:
+        mode = hrcl.parallel
     mode.ms_sl_extra_info(
         id_list=query,
         db_path=db_path,

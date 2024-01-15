@@ -49,7 +49,7 @@ class apnet_disco_js:
 def apnet_disco_js_headers():
     return [
         "id",
-        "PRO_PDB",
+        "PRO_PDB_Hs",
         "LIG_PDB",
         "WAT_PDB",
         "OTH_PDB",

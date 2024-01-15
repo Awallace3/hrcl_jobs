@@ -218,53 +218,67 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     WAT_PDBQT = js.WAT_PDB + "qt"
     OTH_PDBQT = js.OTH_PDB + "qt"
     PRO = PRO_PDBQT.replace(".pdbqt", "")
-    try:
-        docking_tools_amw.prepare_receptor4.prepare_receptor4(
-            receptor_filename=js.PRO_PDB,
-            outputfilename=PRO_PDBQT,
-            # charges_to_add=None,
+    # try:
+    print(js.LIG_PDB)
+    print(LIG_PDBQT)
+    print(js.PRO_PDB)
+    print(PRO_PDBQT)
+    print(PRO)
+    docking_tools_amw.prepare_receptor4.prepare_receptor4(
+        receptor_filename=js.PRO_PDB,
+        outputfilename=PRO_PDBQT,
+        # charges_to_add=None,
+    )
+    docking_tools_amw.prepare_ligand4.prepare_ligand4(
+        ligand_filename=js.LIG_PDB,
+        outputfilename=LIG_PDBQT,
+        repairs="hydrogen",
+        # charges_to_add=None,
+    )
+    # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
+    com = get_com(js.LIG_PDB)
+    print(f"Center of Mass: {com}")
+    # set the ligand
+    vina_errors = None
+    # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
+    # NOTE: receptor must be set before ligand
+    if sf_name in ["vina", "vinardo"]:
+        print(sf_name)
+        v.set_receptor(PRO_PDBQT)
+        v.compute_vina_maps(center=com, box_size=box_size)
+    elif sf_name == "ad4":
+        def_dir = os.getcwd()
+        os.chdir("/".join(PRO.split("/")[:-1]))
+        PRO = PRO.split("/")[-1]
+        PRO_PDBQT = PRO_PDBQT.split("/")[-1]
+        LIG_PDBQT = LIG_PDBQT.split("/")[-1]
+        docking_tools_amw.prepare_gpf.prepare_gpf(
+            receptor_filename=PRO_PDBQT,
+            ligand_filename=LIG_PDBQT,
+            output_gpf_filename=f"{PRO}.gpf",
+            parameters=[npts_param],
         )
-        print(js.LIG_PDB)
-        print(LIG_PDBQT)
-        print(js.PRO_PDB)
-        print(PRO_PDBQT)
-        docking_tools_amw.prepare_ligand4.prepare_ligand4(
-            ligand_filename=js.LIG_PDB,
-            outputfilename=LIG_PDBQT,
-            repairs="hydrogen",
-            # charges_to_add=None,
-        )
-        # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
-        com = get_com(js.LIG_PDB)
-        print(f"Center of Mass: {com}")
-        # set the ligand
-        vina_errors = None
-        # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
-        # NOTE: receptor must be set before ligand
-        if sf_name in ["vina", "vinardo"]:
-            print(sf_name)
-            v.set_receptor(PRO_PDBQT)
-            v.compute_vina_maps(center=com, box_size=box_size)
-        elif sf_name == "ad4":
-            docking_tools_amw.prepare_gpf.prepare_gpf(
-                ligand_filename=ligand_pdbqt,
-                receptor_filename=receptor_pdbqt,
-                parameters=[npts_params],
-            )
-            cmd = f"autogrid4 -p receptor.gpf -l receptor.glg"
-            out = subprocess.run(cmd, shell=True, check=True)
-            v.load_maps(PRO)
-        else:
-            vina_errors = "invalid sf_name"
-        v.set_ligand_from_file(LIG_PDBQT)
+        cmd = f"autogrid4 -p {PRO}.gpf -l {PRO}.glg"
+        print(cmd)
+        os.system(cmd)
+        v.load_maps(PRO)
+    else:
+        vina_errors = "invalid sf_name"
+    v.set_ligand_from_file(LIG_PDBQT)
 
-        # docking
-        v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
-        vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
-        v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
-        energies = v.energies(n_poses=n_poses)
-    except Exception as e:
-        vina_errors = e
+    # docking
+    v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
+    vina_out = LIG_PDBQT.replace(".pdbqt", "_out.pdbqt")
+    v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
+    energies = v.energies(n_poses=n_poses)
+
+    if sf_name == "ad4":
+        # cmd = f"rm *.glg *.gpf *.map* "
+        # os.system(cmd)
+        os.chdir(def_dir)
+
+    # except Exception as e:
+    #     vina_errors = e
     if vina_errors == None:
         return [
             energies[0][0],
