@@ -14,7 +14,7 @@ HIVE_PARAMS = {
 def apnet_disco_dataset(
     db_path,
     table_name,
-    col_check="apnet_totl_LIG",
+    col_check="apnet_totl__LIG",
     assay="KD",
     hex=False,
     check_apnet_errors=False,
@@ -39,15 +39,16 @@ def apnet_disco_dataset(
         print(f"{rank = } {memory_per_thread = } ")
 
     output_columns = [col_check]
-    suffix = col_check.split("_")[1:]
+    suffix = col_check.split("__")[1:]
     for i in ["apnet_elst", "apnet_exch", "apnet_indu", "apnet_disp"]:
-        output_columns.append(i + "_" + "_".join(suffix))
+        output_columns.append(i + "__" + "__".join(suffix))
     output_columns.append("apnet_errors")
     print(output_columns)
 
     matches = {
         col_check: ["NULL"],
         "Assay": [assay],
+        "PRO_PDB_Hs": ["NOT NULL"],
     }
     if check_apnet_errors:
         matches["apnet_errors"] = ["NULL"]
@@ -56,13 +57,16 @@ def apnet_disco_dataset(
     query = hrcl.sqlt.query_columns_for_values(
         cur,
         table_name,
-        # id_names=["id", "PRO_PDB", "LIG_PDB", "WAT_PDB", "OTH_PDB"],
         id_names=["id"],
         matches=matches,
     )
-    # query = [7916 ]
+    extra_info['n_cpus'] = num_omp_threads
 
-    hrcl.parallel.ms_sl_extra_info(
+    if not parallel:
+        mode = hrcl.serial
+    else:
+        mode = hrcl.parallel
+    mode.ms_sl_extra_info(
         id_list=query,
         db_path=db_path,
         table_name=table_name,
@@ -82,7 +86,7 @@ def vina_api_disco_dataset(
     db_path,
     table_name,
     col_check="vina_total__LIG",
-    assay="KI",
+    assay="KD",
     hex=False,
     check_apnet_errors=False,
     scoring_function="vina",
@@ -113,19 +117,34 @@ def vina_api_disco_dataset(
         rank = comm.Get_rank()
         print(f"{rank = } {memory_per_thread = } ")
 
-    output_columns = [col_check]
-    suffix = col_check.split("__")[1:]
-    for i in [
-        f"{scoring_function}_inter",
-        f"{scoring_function}_intra",
-        f"{scoring_function}_torsion",
-        f"{scoring_function}_best_pose",
-        f"{scoring_function}_poses_pdbqt",
-        f"{scoring_function}_all_poses",
-        f"{scoring_function}_errors",
-    ]:
-        output_columns.append(i + "_" + "_".join(suffix))
-    print(output_columns)
+    suffix = "".join(col_check.split("__")[1:])
+    print(suffix)
+    if scoring_function in ["vina", 'vinardo']:
+        output_columns = [
+            f"{scoring_function}_total__{suffix}",
+            f"{scoring_function}_inter__{suffix}",
+            f"{scoring_function}_intra__{suffix}",
+            f"{scoring_function}_torsion__{suffix}",
+            f"{scoring_function}_intra_best_pose__{suffix}",
+            f"{scoring_function}_poses_pdbqt__{suffix}",
+            f"{scoring_function}_all_poses__{suffix}",
+            f"{scoring_function}_errors__{suffix}",
+        ]
+    elif scoring_function == "ad4":
+        output_columns = [
+            f"{scoring_function}_total__{suffix}",
+            f"{scoring_function}_inter__{suffix}",
+            f"{scoring_function}_intra__{suffix}",
+            f"{scoring_function}_torsion__{suffix}",
+            f"{scoring_function}_minus_intra__{suffix}",
+            f"{scoring_function}_poses_pdbqt__{suffix}",
+            f"{scoring_function}_all_poses__{suffix}",
+            f"{scoring_function}_errors__{suffix}",
+        ]
+    else:
+        print("scoring function not recognized")
+        return
+    print(f"{output_columns = }")
 
     matches = {
         col_check: ["NULL"],
@@ -134,6 +153,8 @@ def vina_api_disco_dataset(
 
     if check_apnet_errors:
         matches[f"{scoring_function}_errors_{suffix}"] = ["NULL"]
+
+    print(f"Connecting to {db_path}:{table_name}...")
 
     con, cur = hrcl.sqlt.establish_connection(db_path)
     query = hrcl.sqlt.query_columns_for_values(
@@ -144,7 +165,8 @@ def vina_api_disco_dataset(
     )
 
     extra_info["sf_name"] = scoring_function
-    query = [7916 ]
+    extra_info['n_cpus'] = num_omp_threads
+    # query = [7916 ]
     # print(query)
     # query = [query[0]]
     print(f"Total number of jobs: {len(query)}")

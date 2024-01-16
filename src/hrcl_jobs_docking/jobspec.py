@@ -42,6 +42,8 @@ class apnet_disco_js:
     LIG_PDB: str
     WAT_PDB: str
     OTH_PDB: str
+    PRO_CHARGE: int
+    LIG_CHARGE: int
     extra_info: {}
     mem: str
 
@@ -53,6 +55,8 @@ def apnet_disco_js_headers():
         "LIG_PDB",
         "WAT_PDB",
         "OTH_PDB",
+        "PRO_CHARGE",
+        "LIG_CHARGE",
     ]
 
 @dataclass

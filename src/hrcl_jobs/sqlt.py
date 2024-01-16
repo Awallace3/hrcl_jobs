@@ -405,6 +405,7 @@ def update_by_id(
         "environment_multipole_A",
         "environment_multipole_B",
     ],
+    insert_none=True,
 ) -> None:
     """
     update_mp_rows
@@ -420,10 +421,11 @@ def update_by_id(
         WHERE
             {id_label}=?;
     """
-    for i in output:
-        if i is None:
-            print(f"None in output, skipping {id_value}: {output = }...")
-            return
+    if not insert_none:
+        for i in output:
+            if i is None:
+                print(f"None in output, skipping {id_value}: {output = }...")
+                return
     cursor.execute(
         cmd,
         (*tuple(output), id_value),
@@ -437,7 +439,7 @@ def update_rows(
     cursor,
     output: list,
     col_val: int,  # could be string as well
-    col_match="rowid",
+    col_match="id",
     table="main",
     output_columns=[
         "electric_field_A",
@@ -461,8 +463,8 @@ def update_rows(
             {col_match}=?;
     """
     if verbose:
-        print("headers", headers)
-        print("output", output)
+        print("HEADERS = ", headers)
+        print("OUTPUT = ", output)
         print(
             (*tuple(output), col_val),
         )
@@ -698,6 +700,8 @@ def query_columns_for_values(
             if len(v) == 1:
                 if v[0] == '"NULL"':
                     m = f"{k} IS NULL"
+                elif v[0] == '"NOT NULL"':
+                    m = f"{k} IS NOT NULL"
                 else:
                     m = f"{k}=={v[0]}"
             else:
@@ -1094,6 +1098,8 @@ def merge_db_cols(
     },
     overwrite=True,
 ):
+    print(f"db1: {db1['db_path']}")
+    print(f"db2: {db2['db_path']}")
     con1, cur1 = establish_connection(db1["db_path"])
     con2, cur2 = establish_connection(db2["db_path"])
     for i in db2["col_names"]:
@@ -1108,7 +1114,6 @@ def merge_db_cols(
                 i: ["NOT NULL"],
             },
         )
-        print(q1)
         if overwrite or len(q1) == 0:
             print("Updating...")
             q2 = sqlt_execute(
@@ -1128,6 +1133,14 @@ def merge_db_cols(
             sql_cmd = f"UPDATE {db1['table_name']} SET {i}=:value WHERE rowId=:id"
             print(sql_cmd)
             con1.executemany(sql_cmd, update)
-            print(list(con1.execute(f"select {i} from {db1['table_name']}")))
+            # print(list(con1.execute(f"select {i} from {db1['table_name']}")))
             con1.commit()
     return
+
+def rename_column(conn, table_name, old_column_name, new_column_name):
+    sql_cmd = f"""ALTER TABLE {table_name} RENAME COLUMN {old_column_name} TO {new_column_name};"""
+    print(sql_cmd)
+    c = conn.cursor()
+    c.execute(sql_cmd)
+    conn.commit()
+    return sql_cmd

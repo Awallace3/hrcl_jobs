@@ -66,6 +66,10 @@ def ms_sl_extra_info(
             table=table_name,
         )
         output = run_js_job(js)
+        insertion_str = ""
+        if print_insertion:
+            insertion_str = f", output={output}"
+        print(f"\nMAIN: id {active_ind} inserted{insertion_str}\n")
         update_func(
             con,
             cur,
