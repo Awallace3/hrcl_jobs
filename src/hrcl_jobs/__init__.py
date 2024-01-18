@@ -1,5 +1,6 @@
 import warnings
 from . import sqlt
+from . import pgsql
 from . import serial
 from . import jobspec
 try:
@@ -8,11 +9,11 @@ try:
     from . import examples
     from . import utils
 except ImportError:
-    warnings.warn("Could not import all modules from hrcl_jobs.parallel (install mpi4py)")
+    # warnings.warn("Could not import all modules from hrcl_jobs.parallel (install mpi4py)")
     pass
 
 try:
     from . import dataset 
 except ImportError:
-    warnings.warn("Could not import all modules from hrcl_jobs.dataset (install mpi4py and psi4)")
+    # warnings.warn("Could not import all modules from hrcl_jobs.dataset (install mpi4py and psi4)")
     pass

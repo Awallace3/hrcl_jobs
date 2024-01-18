@@ -88,7 +88,7 @@ def vina_api_disco_dataset(
     col_check="vina_total__LIG",
     assay="KD",
     hex=False,
-    check_apnet_errors=False,
+    check_errors=True,
     scoring_function="vina",
     extra_info={
         "sf_params": {
@@ -151,8 +151,8 @@ def vina_api_disco_dataset(
         "Assay": [assay],
     }
 
-    if check_apnet_errors:
-        matches[f"{scoring_function}_errors_{suffix}"] = ["NULL"]
+    if check_errors:
+        matches[f"{scoring_function}_errors__{suffix}"] = ["NULL"]
 
     print(f"Connecting to {db_path}:{table_name}...")
 

@@ -1114,6 +1114,7 @@ def merge_db_cols(
                 i: ["NOT NULL"],
             },
         )
+        print(f"{len(q1)} rows in {db1['table_name']} with {i} not null")
         if overwrite or len(q1) == 0:
             print("Updating...")
             q2 = sqlt_execute(
