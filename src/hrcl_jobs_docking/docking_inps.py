@@ -226,7 +226,7 @@ def prepare_receptor4(receptor_filename, outputfilename):
     out = subprocess.run(cmd, shell=True, check=True)
 
 
-def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
+def run_autodock_vina(js: jobspec.autodock_vina_disco_js, verbose=1) -> []:
     """
     User must provide the following in js.extra_info:
     - sf_name: str
@@ -256,7 +256,7 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         box_size = [30, 30, 30]
     npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
     sf_name = js.extra_info["sf_name"]
-    v = Vina(sf_name=sf_name, cpu=js.extra_info["n_cpus"])
+    v = Vina(sf_name=sf_name, cpu=js.extra_info["n_cpus"], seed=875234)
     PRO_PDBQT = js.PRO_PDB + "qt"
     LIG_PDBQT = js.LIG_PDB + "qt"
     # WAT_PDBQT = js.WAT_PDB + "qt"
@@ -264,11 +264,8 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
     PRO = PRO_PDBQT.replace(".pdbqt", "")
     def_dir = os.getcwd()
     try:
-        print(js.LIG_PDB)
-        print(LIG_PDBQT)
-        print(js.PRO_PDB)
-        print(PRO_PDBQT)
-        print(PRO)
+        if verbose:
+            print(PRO_PDBQT, LIG_PDBQT, sep="\n")
         docking_tools_amw.prepare_receptor4.prepare_receptor4(
             receptor_filename=js.PRO_PDB,
             outputfilename=PRO_PDBQT,
@@ -282,7 +279,6 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
         )
         # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
         com = get_com(js.LIG_PDB)
-        print(f"Center of Mass: {com}")
         # set the ligand
         ad_vina_errors = None
         # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
@@ -303,7 +299,6 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js) -> []:
                 parameters=[npts_param],
             )
             cmd = f"autogrid4 -p {PRO}.gpf -l {PRO}.glg"
-            print(cmd)
             os.system(cmd)
             v.load_maps(PRO)
         else:

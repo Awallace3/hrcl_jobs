@@ -4,6 +4,8 @@ import numpy as np
 """
 All dataclass_js should have id_label for ms_sl() usage to update sql db
 correctly
+
+if you are using a postgresql db, you need to include mem set to None to have compatability with sql
 """
 
 
@@ -12,7 +14,7 @@ class example_js:
     id_label: int
     val: float
     extra_info: {}
-    mem: str
+    mem: str = None
 
 
 @dataclass
@@ -45,7 +47,7 @@ class apnet_disco_js:
     PRO_CHARGE: int
     LIG_CHARGE: int
     extra_info: {}
-    mem: str
+    mem: str = None
 
 
 def apnet_disco_js_headers():
@@ -67,7 +69,7 @@ class autodock_vina_disco_js:
     WAT_PDB: str
     OTH_PDB: str
     extra_info: {}
-    mem: str
+    mem: str = None
 
 
 def autodock_vina_disco_js_headers():
