@@ -226,14 +226,27 @@ def subset_df(index_split=range(10000, 10050)):
     return
 
 
-def update_column_value(con, cur, table_name, column_name, value):
+def update_column_value(
+    con,
+    cur,
+    table_name,
+    column_name,
+    value,
+    matches={},
+    joiner="AND",
+    verbose=1,
+):
     """
     update_column_value
     """
+    cmd = f"UPDATE {table_name} SET {column_name} = {value}"
+    cmd = handle_sql_matches(matches, cmd)
+    if verbose:
+        print(cmd)
     try:
-        cur.execute(f"UPDATE {table_name} SET {column_name} = {value}")
+        cur.execute(cmd)
         con.commit()
-    except e:
+    except (Exception) as e:
         print(e)
         return False
     return True
@@ -282,12 +295,12 @@ def convert_df_into_sql(
     print(input_columns)
 
     for k, v in output_columns.items():
-        if v.lower() == "float":
-            df[k] = [float(0) for i in range(len(df))]
+        if v.lower() == "float" or v.lower() == "real" or v.lower() == "integer":
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "array":
-            df[k] = [np.zeros(2) for i in range(len(df))]
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "text":
-            df[k] = ["" for i in range(len(df))]
+            df[k] = [pd.NA for i in range(len(df))]
         elif v.lower() == "integer primary key":
             df[k] = [i for i in range(len(df))]
         else:
@@ -393,6 +406,7 @@ def update_by_id(
         "environment_multipole_A",
         "environment_multipole_B",
     ],
+    insert_none=True,
 ) -> None:
     """
     update_mp_rows
@@ -408,10 +422,11 @@ def update_by_id(
         WHERE
             {id_label}=?;
     """
-    for i in output:
-        if i is None:
-            print(f"None in output, skipping {id_value}: {output = }...")
-            return
+    if not insert_none:
+        for i in output:
+            if i is None:
+                print(f"None in output, skipping {id_value}: {output = }...")
+                return
     cursor.execute(
         cmd,
         (*tuple(output), id_value),
@@ -423,9 +438,9 @@ def update_by_id(
 def update_rows(
     conn,
     cursor,
-    output,
-    col_val,
-    col_match="rowid",
+    output: list,
+    col_val: int,  # could be string as well
+    col_match="id",
     table="main",
     output_columns=[
         "electric_field_A",
@@ -435,16 +450,12 @@ def update_rows(
         "environment_multipole_A",
         "environment_multipole_B",
     ],
+    verbose=1,
 ) -> None:
     """
     update_mp_rows
     """
     headers = ",\n".join([f"{i} = ?" for i in output_columns])
-    print("headers", headers)
-    print("output", output)
-    print(
-        (*tuple(output), col_val),
-    )
     cmd = f"""
         UPDATE {table}
         SET
@@ -452,6 +463,14 @@ def update_rows(
         WHERE
             {col_match}=?;
     """
+    if verbose:
+        print("HEADERS = ", headers)
+        print("OUTPUT = ", output)
+        print(
+            (*tuple(output), col_val),
+        )
+        print(cmd)
+
     cursor.execute(
         cmd,
         (*tuple(output), col_val),
@@ -573,6 +592,28 @@ def query_clean_match(m):
     return m
 
 
+def handle_sql_matches(matches, sql_cmd, joiner="AND"):
+    if len(matches) > 0:
+        where_match = []
+        for k, v in matches.items():
+            v = query_clean_match(v)
+            if len(v) == 1:
+                if v[0] == '"NULL"':
+                    m = f"{k} IS NULL"
+                elif v[0] == '"NOT NULL"':
+                    m = f"{k} IS NOT NULL"
+                elif type(v[0]) == str and "!" in v[0]:
+                    m = f"{k} NOT LIKE '{v[0][2:-1]}'"
+                else:
+                    m = f"{k}=={v[0]}"
+            else:
+                m = f"{k} IN {tuple(v)}"
+            where_match.append(m)
+        wm = f" {joiner} ".join(where_match)
+        sql_cmd = f"""{sql_cmd} WHERE {wm};"""
+    return sql_cmd
+
+
 def sqlt_execute(
     cur,
     table_name,
@@ -587,6 +628,7 @@ def sqlt_execute(
     """
     return_id_list queries db for matches with column and returns id
     """
+    conn = cur.connection
     if type(cols) == str:
         cols = cols
     else:
@@ -606,7 +648,11 @@ def sqlt_execute(
                 else:
                     m = f"{k}=={v[0]}"
             else:
-                m = f"{k} IN {tuple(v)}"
+                if type(v[0]) == str:
+                    v = ", ".join([f"'{i[1:-1]}'" for i in v])
+                    m = f"{k} IN ({v})"
+                else:
+                    m = f"{k} IN {tuple(v)}"
 
             where_match.append(m)
         wm = f" {joiner} ".join(where_match)
@@ -655,6 +701,8 @@ def query_columns_for_values(
             if len(v) == 1:
                 if v[0] == '"NULL"':
                     m = f"{k} IS NULL"
+                elif v[0] == '"NOT NULL"':
+                    m = f"{k} IS NOT NULL"
                 else:
                     m = f"{k}=={v[0]}"
             else:
@@ -844,6 +892,9 @@ def table_to_df_pkl(
     """
     table_to_df_pkl
     """
+    print(f"db_p: {db_p}")
+    print(f"df_p: {df_p}")
+    print(f"table: {table}")
     con, cur = establish_connection(db_p)
     if id_list:
         cmd = f"""SELECT * FROM {table} WHERE {table}.{id_label} IN {tuple(id_list)};"""
@@ -1049,6 +1100,8 @@ def merge_db_cols(
     },
     overwrite=True,
 ):
+    print(f"db1: {db1['db_path']}")
+    print(f"db2: {db2['db_path']}")
     con1, cur1 = establish_connection(db1["db_path"])
     con2, cur2 = establish_connection(db2["db_path"])
     for i in db2["col_names"]:
@@ -1063,7 +1116,7 @@ def merge_db_cols(
                 i: ["NOT NULL"],
             },
         )
-        print(q1)
+        print(f"{len(q1)} rows in {db1['table_name']} with {i} not null")
         if overwrite or len(q1) == 0:
             print("Updating...")
             q2 = sqlt_execute(
@@ -1083,6 +1136,14 @@ def merge_db_cols(
             sql_cmd = f"UPDATE {db1['table_name']} SET {i}=:value WHERE rowId=:id"
             print(sql_cmd)
             con1.executemany(sql_cmd, update)
-            print(list(con1.execute(f"select {i} from {db1['table_name']}")))
+            # print(list(con1.execute(f"select {i} from {db1['table_name']}")))
             con1.commit()
     return
+
+def rename_column(conn, table_name, old_column_name, new_column_name):
+    sql_cmd = f"""ALTER TABLE {table_name} RENAME COLUMN {old_column_name} TO {new_column_name};"""
+    print(sql_cmd)
+    c = conn.cursor()
+    c.execute(sql_cmd)
+    conn.commit()
+    return sql_cmd
