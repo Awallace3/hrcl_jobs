@@ -293,6 +293,7 @@ def compute_energy(
     TESTING=False,
     options=None,
     xtra=None,
+    output_root="schr",
 ) -> None:
     if hex:
         machine = machine_list_resources()
@@ -303,11 +304,7 @@ def compute_energy(
         num_omp_threads = hive_params["num_omp_threads"]
     method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
     js_obj, js_headers, run_js_job = hrcl_psi4.get_parallel_functions(method)
-    basis = col_check.split("_")[-1]
-    col_check = f"{method}_{basis}"
-    table_cols = {
-        f"{method}_{basis}": "array",
-    }
+    table_cols, col_check = hrcl_psi4.get_col_check(method, col_check.split("_")[-1])
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
@@ -324,14 +321,15 @@ def compute_energy(
         num_omp_threads = hive_params["num_omp_threads"]
 
     con, cur = sqlt.establish_connection(DB_NAME)
-    mbis_ids = sqlt.collect_ids_for_parallel(
+    job_ids = sqlt.collect_ids_for_parallel(
         DB_NAME,
         TABLE_NAME,
         col_check=[col_check, "array"],
         matches={
             col_check: ["NULL"],
         },
-        ascending=not TESTING,
+        # ascending=not TESTING,
+        ascending=TESTING,
         sort_column="Geometry",
     )
     if options is None:
@@ -347,13 +345,13 @@ def compute_energy(
             "num_threads": num_omp_threads,
             "level_theory": [f"{method}/{basis_str}"],
             "out": {
-                "path": "schr",
+                "path": output_root,
                 "version": "1",
             },
         }
     print(f"{xtra = }")
     parallel.ms_sl_extra_info(
-        id_list=mbis_ids,
+        id_list=job_ids,
         db_path=DB_NAME,
         table_name=TABLE_NAME,
         js_obj=js_obj,

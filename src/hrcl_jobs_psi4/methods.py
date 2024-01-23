@@ -6,6 +6,7 @@ simple_methods = [
     "sapt0",
     "pbe0",
     "pbe",
+    "sapt2+3(ccd)dmp2",
 ]
 
 

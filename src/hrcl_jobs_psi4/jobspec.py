@@ -57,6 +57,24 @@ class grimme_js:
     level_theory: [str]
     mem: str
 
+@dataclass
+class sapt_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str
+
+def sapt_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "monAs",
+        "monBs",
+        "charges",
+    ]
 
 @dataclass
 class sapt0_js:

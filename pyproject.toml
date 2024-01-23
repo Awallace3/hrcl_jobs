@@ -16,6 +16,23 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "matplotlib",
+    "qm_tools_aw",
+    "numpy>=1.20.0",
+    "pandas>=1.4.3"
+
+]
+[project.optional-dependencies]
+psi4_calculations = [
+    "psi4>=1.7",
+]
+ad4_vina_calculations = [
+    "autodock-vina",
+]
+openmm_calculations = [
+    "openmm",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/Awallace3/hierarchical_python_jobs"

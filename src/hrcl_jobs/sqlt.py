@@ -89,6 +89,7 @@ def table_add_columns(
     con: sql.Connection,
     table_name: str,
     table_dict: dict,
+    debug: bool = True,
 ) -> bool:
     """
     table_add_columns insert columns into a table.
@@ -935,6 +936,7 @@ def create_update_table(
     table_name: str,
     table_cols: dict,
     data: dict = {},
+    debug = True,
 ) -> bool:
     """
     create_update_table will either create a new table

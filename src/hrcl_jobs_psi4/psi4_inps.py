@@ -855,7 +855,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         handle_hrcl_extra_info_options(js, l)
         mol = psi4.geometry(geom)
         e = psi4.energy(f"{l}")
-
         e *= constants.conversion_factor("hartree", "kcal / mol")
         ELST = psi4.core.variable("SAPT ELST ENERGY")
         EXCH = psi4.core.variable("SAPT EXCH ENERGY")
@@ -866,7 +865,6 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
         es.append(out_energies)
         handle_hrcl_psi4_cleanup(js, l)
-
     return es
 
 
@@ -1060,7 +1058,8 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
         out_json = f"{job_dir}/{sub_job}_vars.json"
-        if os.path.exists(out_json):
+        print(f"{out_json = }")
+        if os.path.exists(job_dir):
             with open(out_json, "w") as f:
                 out = psi4.core.variables()
                 if wfn is not None:
@@ -1431,7 +1430,7 @@ def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
     if not generate_outputs:
         print("No output file specified. Not generating input files.")
     for l in js.extra_info["level_theory"]:
-        sub_job = "dlpno-ccsd"
+        sub_job = js.extra_info['options']['pno_convergence']
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
