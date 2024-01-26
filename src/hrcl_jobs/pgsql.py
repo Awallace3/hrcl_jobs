@@ -49,6 +49,17 @@ def establish_connection(dbinfo=psqldb, user=None, password=None, host=None):
     cur = conn.cursor()
     return conn, cur
 
+def execute_sql_file(filename, connection):
+    # Read the SQL file
+    with open(filename, 'r') as file:
+        sql_script = file.read()
+
+    # Execute the SQL commands
+    with connection.cursor() as cursor:
+        cursor.execute(sql_script)
+        connection.commit()
+    return
+
 
 def schema_information(conn, cur, schema_name):
     cur.execute(
