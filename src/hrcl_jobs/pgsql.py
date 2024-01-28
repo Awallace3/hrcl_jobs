@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from .jobspec import example_js
 from . import sqlt
 
+
 @dataclass
 class example_js:
     id_label: int
     val: float
     extra_info: {}
     mem: str = None
+
 
 @dataclass
 class psqldb:
@@ -20,10 +22,61 @@ class psqldb:
     password: str
     host: str
 
+
 def connect(url):
     conn = psycopg2.connect(url)
     cur = conn.cursor()
     return conn, cur
+
+
+class pgsql_operations:
+    def __init__(
+        self,
+        pgsql_url: str,
+        table_name: str,
+        schema_name: str,
+        init_query_cmd,
+        job_query_cmd: str,
+        update_cmd: str,
+    ):
+        self.pgsql_url = pgsql_url
+        self.table_name = table_name
+        self.schema_name = schema_name
+        self.init_query_cmd = init_query_cmd
+        self.job_query_cmd = job_query_cmd
+        self.update_cmd = update_cmd
+
+    def init_query(self, conn, where_value):
+        cur = conn.cursor()
+        cur.execute(self.init_query_cmd, (where_value,))
+        return cur.fetchall()
+
+    def job_query(self, conn, id, js_obj):
+        cur = conn.cursor()
+        if isinstance(id, list):
+            cmd = self.job_query_cmd.replace("%s", f"{tuple(id)}")
+            cur.execute(cmd)
+        else:
+            cur.execute(self.job_query_cmd, (id,))
+        js_ls = [
+            js_obj(
+                *i,
+            )
+            for i in cur.fetchall()
+        ]
+        if len(js_ls) == 1:
+            return js_ls[0]
+        return js_ls
+
+    def insert(self, conn, output, id_value):
+        cur = conn.cursor()
+        cur.execute(self.update_cmd, (*output, id_value))
+        conn.commit()
+        return
+    
+    def connect_db(self):
+        conn, cur = connect(self.pgsql_url)
+        return conn, cur
 
 
 def establish_connection(dbinfo=psqldb, user=None, password=None, host=None):
@@ -49,9 +102,10 @@ def establish_connection(dbinfo=psqldb, user=None, password=None, host=None):
     cur = conn.cursor()
     return conn, cur
 
+
 def execute_sql_file(filename, connection):
     # Read the SQL file
-    with open(filename, 'r') as file:
+    with open(filename, "r") as file:
         sql_script = file.read()
 
     # Execute the SQL commands
@@ -263,3 +317,28 @@ def query_columns_for_values(
         if len(val_list[i]) == 1:
             val_list[i] = val_list[i][0]
     return val_list
+
+
+def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
+    user_path_expand = os.path.expanduser(pw_source)
+    with open(user_path_expand, "r") as f:
+        data = f.readlines()
+    user = data[0].strip()
+    pw = urllib.parse.quote_plus(data[1].strip())
+    # ip_db = "128.61.254.12:5432"
+    if ip_db is None:
+        cmd = "hostname -I | awk '{print $1}'"
+        ip_db = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+        ip_db = f"{ip_db}:{port}"
+
+    psqldb = hrcl_jobs.pgsql.psqldb(
+        dbname=dbname,
+        user=user,
+        host=ip_db,
+        password=pw,
+    )
+    pg_url = (
+        f"postgresql://{psqldb.user}:{psqldb.password}@{psqldb.host}/{psqldb.dbname}"
+    )
+    print(pg_url)
+    return pg_url

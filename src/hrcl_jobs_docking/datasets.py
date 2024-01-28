@@ -34,6 +34,7 @@ def apnet_disco_dataset(
         num_omp_threads = hive_params["num_omp_threads"]
     if parallel:
         from mpi4py import MPI
+
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         print(f"{rank = } {memory_per_thread = } ")
@@ -60,7 +61,7 @@ def apnet_disco_dataset(
         id_names=["id"],
         matches=matches,
     )
-    extra_info['n_cpus'] = num_omp_threads
+    extra_info["n_cpus"] = num_omp_threads
 
     if not parallel:
         mode = hrcl.serial
@@ -82,11 +83,58 @@ def apnet_disco_dataset(
     return
 
 
+def example_queriers():
+    cmd_ids = f"""
+        SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
+        JOIN {schema_name}.protein_ligand__{table_name} plsf
+            ON plsf.pl_id = sf.{scoring_function}_id
+        JOIN {schema_name}.protein_ligand pl
+            ON plsf.pl_id = pl.pl_id
+            WHERE pl.assay = (%s)
+            AND {col_check} IS NOT NULL
+        ;
+    """
+    cur.execute(cmd_ids, (assay,))
+    query = cur.fetchall()
+    id = query[:2]
+    print(id)
+    for i in query:
+        id = i[0]
+        cmd_inputs = f"""
+        SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
+            JOIN {schema_name}.protein_ligand__{table_name} plsf
+                ON plsf.pl_id = sf.{scoring_function}_id
+            JOIN {schema_name}.protein_ligand pl
+                ON plsf.pl_id = pl.pl_id
+            WHERE sf.{scoring_function}_id = (%s)
+                ;
+        """
+        cur.execute(cmd_inputs, (id,))
+        query = cur.fetchall()
+        js = jobspec.autodock_vina_disco_js(
+            *query[0],
+            extra_info,
+            "",
+        )
+        print(js)
+        out = docking_inps.run_autodock_vina(js)
+        print(out)
+        cmd_insert = f"""
+        INSERT INTO {schema_name}.{table_name} sf
+        ({", ".join(output_columns)}) VALUES 
+        ({", ".join(['%s'] * len(output_columns))})
+        WHERE {scoring_function}_id = (%s)
+        ;
+        """
+        print(cmd_insert)
+        cur.execute(cmd_insert, (*out, id))
+
+
 def vina_api_disco_dataset(
     # db_path,
-    psqldb_info = hrcl.pgsql.psqldb,
-    schema_name = "disco_docking",
-    table_name = "vina",
+    psqldb_url=hrcl.pgsql.psqldb,
+    schema_name="disco_docking",
+    table_name="vina",
     col_check="vina_total",
     assay="KD",
     hex=False,
@@ -105,7 +153,7 @@ def vina_api_disco_dataset(
     },
     parallel=True,
 ):
-    """ 
+    """
     Assumes postgresql database with schema_name:
     פּ {schema_name} (11)
          ad4
@@ -114,7 +162,6 @@ def vina_api_disco_dataset(
          protein_ligand
          protein_ligand__ad4
          protein_ligand__apnet
-         protein_ligand__experiment
          protein_ligand__vina
          protein_ligand__vinardo
          vina
@@ -131,14 +178,15 @@ def vina_api_disco_dataset(
         num_omp_threads = hive_params["num_omp_threads"]
     if parallel:
         from mpi4py import MPI
+
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         print(f"{rank = } {memory_per_thread = } ")
 
     extra_info["sf_name"] = scoring_function
-    extra_info['n_cpus'] = num_omp_threads
+    extra_info["n_cpus"] = num_omp_threads
 
-    if scoring_function in ["vina", 'vinardo']:
+    if scoring_function in ["vina", "vinardo"]:
         output_columns = [
             f"{scoring_function}_total",
             f"{scoring_function}_inter",
@@ -195,7 +243,7 @@ def vina_api_disco_dataset(
         "disco_docking",
     ]
     # con, cur = hrcl.pgsql.establish_connection(psqldb_info)
-    con, cur = hrcl.pgsql.connect(psqldb_info)
+    con, cur = hrcl.pgsql.connect(psqldb_url)
     if table_name not in allowed_table_names:
         print(f"table_name must be one of {allowed_table_names}")
         return
@@ -206,25 +254,24 @@ def vina_api_disco_dataset(
         print(f"col_check must be one of {allowed_columns}")
         return
     # need to join along 3 tables, experiment, protein_ligand, and protein_ligand__{scoring_function}
-    cmd_ids = f"""
+    # return
+    # ./disco_data/HIVRT/PDB_Structures/1RT3_LIG_out.pdbqt
+
+    pgsql_op = hrcl.pgsql.pgsql_operations(
+        pgsql_url=psqldb_url,
+        table_name=table_name,
+        schema_name=schema_name,
+        init_cmd=f"""
         SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
         JOIN {schema_name}.protein_ligand__{table_name} plsf
             ON plsf.pl_id = sf.{scoring_function}_id
         JOIN {schema_name}.protein_ligand pl
             ON plsf.pl_id = pl.pl_id
-        JOIN {schema_name}.experiment e
-            ON pl.pl_id = e.exp_id
-            WHERE e.assay = (%s)
+            WHERE pl.assay = (%s)
             AND {col_check} IS NOT NULL
         ;
-    """
-    cur.execute(cmd_ids, (assay,))
-    query = cur.fetchall()
-    id = query[:2]
-    print(id)
-    for i in query:
-        id = i[0]
-        cmd_inputs = f"""
+    """,
+        job_query_cmd=f"""
         SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.pl_id = sf.{scoring_function}_id
@@ -232,28 +279,16 @@ def vina_api_disco_dataset(
                 ON plsf.pl_id = pl.pl_id
             WHERE sf.{scoring_function}_id = (%s)
                 ;
-        """
-        cur.execute(cmd_inputs, (id,))
-        query = cur.fetchall()
-        js = jobspec.autodock_vina_disco_js(
-            *query[0],
-            extra_info,
-            "",
-        )
-        print(js)
-        out = docking_inps.run_autodock_vina(js)
-        print(out)
-        cmd_insert = f"""
+        """,
+        insert_cmd=f"""
         INSERT INTO {schema_name}.{table_name} sf
         ({", ".join(output_columns)}) VALUES 
         ({", ".join(['%s'] * len(output_columns))})
         WHERE {scoring_function}_id = (%s)
         ;
         """
-        print(cmd_insert)
-        cur.execute(cmd_insert, (*out, id))
-    # return
-    # ./disco_data/HIVRT/PDB_Structures/1RT3_LIG_out.pdbqt
+    )
+    query = pgsql_op.init_query(con, assay)
 
     print(f"Total number of jobs: {len(query)}")
 
@@ -262,14 +297,12 @@ def vina_api_disco_dataset(
     else:
         mode = hrcl.parallel
     mode.ms_sl_extra_info_pg(
+        pgsql_op=pgsql_op,
         id_list=query,
-        db_path=db_path,
-        table_name=table_name,
         js_obj=jobspec.autodock_vina_disco_js,
         headers_sql=jobspec.autodock_vina_disco_js_headers(),
         run_js_job=docking_inps.run_autodock_vina,
         extra_info=extra_info,
-        ppm=memory_per_thread,
         id_label="id",
         output_columns=output_columns,
         print_insertion=True,

@@ -14,7 +14,7 @@ import os
 from glob import glob
 import time
 from .jobspec import example_js
-from . import pgsql 
+from . import pgsql
 
 
 def example_run_js_job(js: example_js) -> float:
@@ -24,6 +24,7 @@ def example_run_js_job(js: example_js) -> float:
     v1 = js.val + 1
     v2 = js.val + 2
     return [v1, v2]
+
 
 class machineResources:
     def __init__(
@@ -43,19 +44,14 @@ class machineResources:
         self.omp_threads = omp_threads
 
 
+
+
 def ms_sl_extra_info_pg(
+    pgsql_op: pgsql.pgsql_operations,
     id_list=[0, 50],
-    db_path="db/dimers_all.db",
     run_js_job=example_run_js_job,
-    extra_info={}, # memory requirements should be set here
-    headers_sql=["id", "RA", "RB", "ZA", "ZB"],
+    extra_info={},  # memory requirements should be set here
     js_obj=example_js,
-    table_name="main",
-    id_label="id",
-    output_columns=[
-        "HF_adz",
-        "MP2_adz",
-    ],
     print_insertion=False,
 ):
     """
@@ -84,28 +80,10 @@ def ms_sl_extra_info_pg(
         cur_rows = []
         id_list_first = id_list[: n_procs - 1]
         if len(id_list) == 1 or n_procs == 2:
-            js = pgsql.collect_id_into_js(
-                cur,
-                headers_sql,
-                extra_info,
-                js_obj,
-                id_list[0],
-                id_label,
-                table_name,
-            )
+            js = pgsql_op.job_query_cmd(conn, id_list[0], js_obj)
             r = [js]
-
         else:
-            r = pgsql.collect_ids_into_js_ls(
-                cur,
-                headers_sql,
-                ppm,
-                extra_info,
-                js_obj,
-                id_list_first,
-                id_label,
-                table_name,
-            )
+            r = pgsql_op.job_query_cmd(conn, id_list_first, js_obj)
 
         for n, js in enumerate(r):
             n = n + 1
@@ -123,24 +101,12 @@ def ms_sl_extra_info_pg(
                 req.wait()
             n_procs = len(r) + 1
 
-
         id_list_extra = id_list[len(r) :]
-        # active_ind = jobs + n_procs - 1
-        # while active_ind <= jobs:
         for n, active_ind in enumerate(id_list_extra):
             output = comm.recv(source=MPI.ANY_SOURCE, tag=2)
             target_proc = output.pop()
             id_value = output.pop()
-            js = pgsql.collect_id_into_js(
-                cur,
-                headers_sql,
-                ppm,
-                extra_info,
-                js_obj,
-                active_ind,
-                id_label,
-                table_name,
-            )
+            js = pgsql_op.job_query(conn, active_ind, js_obj)
             comm.send(js, dest=target_proc, tag=2)
             i1 = time.time()
             print(f"MAIN: {n + n_procs - 1} / {jobs}")
@@ -151,15 +117,7 @@ def ms_sl_extra_info_pg(
                         os.remove(i)
                     except FileNotFoundError:
                         continue
-            pgsql.update_by_id(
-                con,
-                cur,
-                output,
-                id_value=id_value,
-                id_label=id_label,
-                table=table_name,
-                output_columns=output_columns,
-            )
+            pgsql_op.update_cmd(conn, output, id_value)
             i2 = time.time() - i1
             insertion_str = ""
             if print_insertion:
@@ -177,22 +135,13 @@ def ms_sl_extra_info_pg(
                     except FileNotFoundError:
                         continue
             id_value = output.pop()
-            pysql.update_by_id(
-                con,
-                cur,
-                output,
-                id_label=id_label,
-                id_value=id_value,
-                table=table_name,
-                output_columns=output_columns,
-            )
+            pgsql_op.update_cmd(conn, output, id_value)
             comm.send(0, dest=target_proc, tag=2)
             insertion_str = ""
             if print_insertion:
                 insertion_str = f", output={output}"
             print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nCOMPLETED MAIN\n")
-
     else:
         js = 1
         req = comm.irecv(source=0, tag=2)
@@ -200,7 +149,7 @@ def ms_sl_extra_info_pg(
         if js == 0:
             print(f"rank: {rank} TERMINATING")
             return
-        print(f"rank: {rank}, js.main_id: {js.id_label}")
+        print(f"rank: {rank}")
         s = time.time()
         js.extra_info = extra_info
         js.mem = ppm
@@ -214,16 +163,17 @@ def ms_sl_extra_info_pg(
             s = time.time()
             js = comm.recv(source=0, tag=2)
             if js != 0:
-                print(f"rank: {rank}, js.main_id: {js.id_label}")
+                print(f"rank: {rank}")
                 js.extra_info = extra_info
                 js.mem = ppm
                 output = run_js_job(js)
                 output.append(js.id_label)
                 output.append(rank)
                 comm.send(output, dest=0, tag=2)
-                print(f"rank: {rank} spent {time.time() - s} seconds on {js.id_label}")
+                print(f"rank: {rank} spent {time.time() - s} seconds")
         print(rank, "TERMINATING")
         return
+
 
 def ms_sl_extra_info(
     id_list=[0, 50],
@@ -314,7 +264,6 @@ def ms_sl_extra_info(
                 req.wait()
             n_procs = len(r) + 1
 
-
         id_list_extra = id_list[len(r) :]
         # active_ind = jobs + n_procs - 1
         # while active_ind <= jobs:
@@ -415,6 +364,7 @@ def ms_sl_extra_info(
                 print(f"rank: {rank} spent {time.time() - s} seconds on {js.id_label}")
         print(rank, "TERMINATING")
         return
+
 
 # READS n_procs from comm now
 def ms_sl(

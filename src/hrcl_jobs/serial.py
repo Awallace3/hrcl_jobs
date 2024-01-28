@@ -25,62 +25,29 @@ def example_run_js_job(js: example_js) -> float:
     return [v1, v2]
 
 def ms_sl_extra_info_pg(
+    pgsql_op: pgsql.pgsql_operations,
     id_list=[0, 50],
-    db_path="db/dimers_all.db",
     run_js_job=example_run_js_job,
-    extra_info={},
-    headers_sql=["main_id", "id", "RA", "RB", "ZA", "ZB", "TQA", "TQB"],
+    extra_info={},  # memory requirements should be set here
     js_obj=example_js,
-    ppm="4gb",
-    table_name="main",
     id_label="id",
-    output_columns=[
-        "env_multipole_A",
-        "env_multipole_B",
-        "vac_widths_A",
-        "vac_widths_B",
-        "vac_vol_rat_A",
-        "vac_vol_rat_B",
-    ],
     print_insertion=False,
 ):
-    """
-    To use ms_sl_serial_extra_info properly, write your own
-    collect_rows_into_js_ls and collect_row_specific_into_js functions to pass
-    as arguements to this function. Ensure that collect_rows_into_js_ls returns
-    the correct js for your own run_js_job function.
-    """
-
     start = time.time()
     first = True
-    con, cur = establish_connection(db_p=db_path)
+    con, cur = pgsql_op.connect_db()
     for n, active_ind in enumerate(id_list):
-        js = pgsql.collect_id_into_js(
-            cur,
-            headers=headers_sql,
-            extra_info=extra_info,
-            dataclass_obj=js_obj,
-            id_value=active_ind,
-            id_label=id_label,
-            table=table_name,
-        )
+        js = pgsql_op.job_query_cmd(conn, active_ind, js_obj)
         output = run_js_job(js)
         insertion_str = ""
         if print_insertion:
             insertion_str = f", output={output}"
         print(f"\nMAIN: id {active_ind} inserted{insertion_str}\n")
-        pgsql.update_by_id(
-            con,
-            cur,
-            output,
-            id_value=active_ind,
-            id_label=id_label,
-            table=table_name,
-            output_columns=output_columns,
-        )
+        pgsql_op.update_cmd(conn, output, active_ind)
     print((time.time() - start) / 60, "Minutes")
     print("COMPLETED MAIN")
     return
+
 
 def ms_sl_extra_info(
     id_list=[0, 50],
