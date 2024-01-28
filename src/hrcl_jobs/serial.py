@@ -30,7 +30,6 @@ def ms_sl_extra_info_pg(
     run_js_job=example_run_js_job,
     extra_info={},  # memory requirements should be set here
     js_obj=example_js,
-    id_label="id",
     print_insertion=False,
 ):
     start = time.time()

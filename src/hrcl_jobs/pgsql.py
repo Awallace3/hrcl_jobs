@@ -31,6 +31,9 @@ def connect(url):
     cur = conn.cursor()
     return conn, cur
 
+class jobQuery(Exception):
+    def __init__(self, msg):
+        self.msg = msg
 
 class pgsql_operations:
     def __init__(
@@ -73,8 +76,12 @@ class pgsql_operations:
             )
             for i in cur.fetchall()
         ]
-        if len(js_ls) == 1:
+        if len(js_ls) == 0:
+            raise jobQuery(f"No jobs found for {id}")
+        elif len(js_ls) == 1:
             return js_ls[0]
+        elif isinstance(id, list) and len(js_ls) != len(id):
+            raise jobQuery(f"No jobs found for {id}")
         return js_ls
 
     def update(self, conn, output, id_value):

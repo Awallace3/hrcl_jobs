@@ -76,14 +76,14 @@ def ms_sl_extra_info_pg(
         jobs = len(id_list)
         start = time.time()
         first = True
-        con, cur = pgsql.establish_connection(db_p=db_path)
+        conn, cur = pgsql_op.connect_db()
         cur_rows = []
         id_list_first = id_list[: n_procs - 1]
         if len(id_list) == 1 or n_procs == 2:
-            js = pgsql_op.job_query_cmd(conn, id_list[0], js_obj)
+            js = pgsql_op.job_query(conn, id_list[0], js_obj, extra_info)
             r = [js]
         else:
-            r = pgsql_op.job_query_cmd(conn, id_list_first, js_obj)
+            r = pgsql_op.job_query(conn, id_list_first, js_obj, extra_info)
 
         for n, js in enumerate(r):
             n = n + 1
@@ -106,7 +106,7 @@ def ms_sl_extra_info_pg(
             output = comm.recv(source=MPI.ANY_SOURCE, tag=2)
             target_proc = output.pop()
             id_value = output.pop()
-            js = pgsql_op.job_query(conn, active_ind, js_obj)
+            js = pgsql_op.job_query(conn, active_ind, js_obj, extra_info)
             comm.send(js, dest=target_proc, tag=2)
             i1 = time.time()
             print(f"MAIN: {n + n_procs - 1} / {jobs}")
@@ -117,7 +117,7 @@ def ms_sl_extra_info_pg(
                         os.remove(i)
                     except FileNotFoundError:
                         continue
-            pgsql_op.update_cmd(conn, output, id_value)
+            pgsql_op.update(conn, output, id_value)
             i2 = time.time() - i1
             insertion_str = ""
             if print_insertion:
@@ -135,7 +135,7 @@ def ms_sl_extra_info_pg(
                     except FileNotFoundError:
                         continue
             id_value = output.pop()
-            pgsql_op.update_cmd(conn, output, id_value)
+            pgsql_op.update(conn, output, id_value)
             comm.send(0, dest=target_proc, tag=2)
             insertion_str = ""
             if print_insertion:
@@ -149,6 +149,9 @@ def ms_sl_extra_info_pg(
         if js == 0:
             print(f"rank: {rank} TERMINATING")
             return
+        if isinstance(js, list):
+            print(f"rank: {rank}, js.main_id: {js.id_label}")
+            raise ValueError("js is a list")
         print(f"rank: {rank}")
         s = time.time()
         js.extra_info = extra_info
@@ -159,7 +162,6 @@ def ms_sl_extra_info_pg(
         comm.send(output, dest=0, tag=2)
         print(f"rank: {rank} TOOK {time.time() - s} seconds")
         while js != 0:
-            # print(f"rank: {rank} is BLOCKED")
             s = time.time()
             js = comm.recv(source=0, tag=2)
             if js != 0:

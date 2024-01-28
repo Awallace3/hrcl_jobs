@@ -266,17 +266,18 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js, verbose=1) -> []:
     try:
         if verbose:
             print(PRO_PDBQT, LIG_PDBQT, sep="\n")
-        docking_tools_amw.prepare_receptor4.prepare_receptor4(
-            receptor_filename=js.PRO_PDB,
-            outputfilename=PRO_PDBQT,
-            # charges_to_add=None,
-        )
-        docking_tools_amw.prepare_ligand4.prepare_ligand4(
-            ligand_filename=js.LIG_PDB,
-            outputfilename=LIG_PDBQT,
-            repairs="hydrogen",
-            # charges_to_add=None,
-        )
+        if not os.path.exists(PRO_PDBQT):
+            docking_tools_amw.prepare_receptor4.prepare_receptor4(
+                receptor_filename=js.PRO_PDB,
+                outputfilename=PRO_PDBQT,
+                # charges_to_add=None,
+            )
+        if not os.path.exists(LIG_PDBQT):
+            docking_tools_amw.prepare_ligand4.prepare_ligand4(
+                ligand_filename=js.LIG_PDB,
+                outputfilename=LIG_PDBQT,
+                repairs="hydrogen",
+            )
         # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
         com = get_com(js.LIG_PDB)
         # set the ligand
@@ -292,14 +293,16 @@ def run_autodock_vina(js: jobspec.autodock_vina_disco_js, verbose=1) -> []:
             PRO = PRO.split("/")[-1]
             PRO_PDBQT = PRO_PDBQT.split("/")[-1]
             LIG_PDBQT = LIG_PDBQT.split("/")[-1]
-            docking_tools_amw.prepare_gpf.prepare_gpf(
-                receptor_filename=PRO_PDBQT,
-                ligand_filename=LIG_PDBQT,
-                output_gpf_filename=f"{PRO}.gpf",
-                parameters=[npts_param],
-            )
-            cmd = f"autogrid4 -p {PRO}.gpf -l {PRO}.glg"
-            os.system(cmd)
+            if not os.path.exists(f"{PRO}.gpf"):
+                docking_tools_amw.prepare_gpf.prepare_gpf(
+                    receptor_filename=PRO_PDBQT,
+                    ligand_filename=LIG_PDBQT,
+                    output_gpf_filename=f"{PRO}.gpf",
+                    parameters=[npts_param],
+                )
+            if not os.path.exists(f"{PRO}.glg"):
+                cmd = f"autogrid4 -p {PRO}.gpf -l {PRO}.glg"
+                os.system(cmd)
             v.load_maps(PRO)
         else:
             ad_vina_errors = "invalid sf_name"

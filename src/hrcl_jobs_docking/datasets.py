@@ -256,52 +256,63 @@ def vina_api_disco_dataset(
         return
     set_columns = ", ".join([f"{i} = %s" for i in output_columns])
 
-    pgsql_op = hrcl.pgsql.pgsql_operations(
-        pgsql_url=psqldb_url,
-        table_name=table_name,
-        schema_name=schema_name,
-        init_query_cmd=f"""
-        SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
-        JOIN {schema_name}.protein_ligand__{table_name} plsf
-            ON plsf.{scoring_function}_id = sf.{scoring_function}_id
-        JOIN {schema_name}.protein_ligand pl
-            ON plsf.pl_id = pl.pl_id
-            WHERE pl.assay = ('{assay}')
-            AND {col_check} IS NULL
-        ;
-    """,
-        job_query_cmd=f"""
-        SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
+    def acquire_pgsql_op():
+        return hrcl.pgsql.pgsql_operations(
+            pgsql_url=psqldb_url,
+            table_name=table_name,
+            schema_name=schema_name,
+            init_query_cmd=f"""
+            SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
-                ON plsf.pl_id = sf.{scoring_function}_id
+                ON plsf.{scoring_function}_id = sf.{scoring_function}_id
             JOIN {schema_name}.protein_ligand pl
                 ON plsf.pl_id = pl.pl_id
-            WHERE sf.{scoring_function}_id = (%s)
-                ;
+                WHERE pl.assay = ('{assay}')
+                AND {col_check} IS NULL
+            ;
         """,
-        update_cmd=f"""
-        UPDATE {schema_name}.{table_name} sf 
-        SET {set_columns}
-        WHERE {scoring_function}_id = (%s)
-        ;
-        """
-    )
-    query = pgsql_op.init_query(con, assay)
-    print(query)
-
-    print(f"Total number of jobs: {len(query)}")
+            job_query_cmd=f"""
+            SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
+                JOIN {schema_name}.protein_ligand__{table_name} plsf
+                    ON plsf.{scoring_function}_id = sf.{scoring_function}_id
+                JOIN {schema_name}.protein_ligand pl
+                    ON plsf.pl_id = pl.pl_id
+                WHERE sf.{scoring_function}_id = %s
+                    ;
+            """,
+            update_cmd=f"""
+            UPDATE {schema_name}.{table_name} sf 
+            SET {set_columns}
+            WHERE {scoring_function}_id = %s
+            ;
+            """
+        )
 
     if not parallel:
         mode = hrcl.serial
+        pgsql_op = acquire_pgsql_op()
+        query = pgsql_op.init_query(con, assay)
+        query = [i[0] for i in query]
+        print(f"Total number of jobs: {len(query)}")
+        print(query)
     else:
         mode = hrcl.parallel
+        if rank == 0:
+            print(f"Total number of jobs: {len(query)}")
+            print(query)
+            pgsql_op = acquire_pgsql_op()
+            query = pgsql_op.init_query(con, assay)
+            query = [i[0] for i in query]
+        else:
+            pgsql_op = None
+            query = None
+
     mode.ms_sl_extra_info_pg(
         pgsql_op=pgsql_op,
         id_list=query,
         js_obj=jobspec.autodock_vina_disco_js,
         run_js_job=docking_inps.run_autodock_vina,
         extra_info=extra_info,
-        id_label="id",
         print_insertion=True,
     )
     return
