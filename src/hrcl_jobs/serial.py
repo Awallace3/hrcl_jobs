@@ -35,15 +35,15 @@ def ms_sl_extra_info_pg(
 ):
     start = time.time()
     first = True
-    con, cur = pgsql_op.connect_db()
+    conn, cur = pgsql_op.connect_db()
     for n, active_ind in enumerate(id_list):
-        js = pgsql_op.job_query_cmd(conn, active_ind, js_obj)
+        js = pgsql_op.job_query(conn, active_ind, js_obj, extra_info)
         output = run_js_job(js)
         insertion_str = ""
         if print_insertion:
             insertion_str = f", output={output}"
         print(f"\nMAIN: id {active_ind} inserted{insertion_str}\n")
-        pgsql_op.update_cmd(conn, output, active_ind)
+        pgsql_op.update(conn, output, active_ind)
     print((time.time() - start) / 60, "Minutes")
     print("COMPLETED MAIN")
     return

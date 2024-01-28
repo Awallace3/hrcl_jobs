@@ -133,10 +133,10 @@ def example_queriers():
 def vina_api_disco_dataset(
     # db_path,
     psqldb_url=hrcl.pgsql.psqldb,
-    schema_name="disco_docking",
+    schema_name="bmoad",
     table_name="vina",
     col_check="vina_total",
-    assay="KD",
+    assay="Kd",
     hex=False,
     check_errors=True,
     scoring_function="vina",
@@ -241,6 +241,7 @@ def vina_api_disco_dataset(
     ]
     allowed_schemas = [
         "disco_docking",
+        'bmoad',
     ]
     # con, cur = hrcl.pgsql.establish_connection(psqldb_info)
     con, cur = hrcl.pgsql.connect(psqldb_url)
@@ -253,22 +254,20 @@ def vina_api_disco_dataset(
     if col_check not in allowed_columns:
         print(f"col_check must be one of {allowed_columns}")
         return
-    # need to join along 3 tables, experiment, protein_ligand, and protein_ligand__{scoring_function}
-    # return
-    # ./disco_data/HIVRT/PDB_Structures/1RT3_LIG_out.pdbqt
+    set_columns = ", ".join([f"{i} = %s" for i in output_columns])
 
     pgsql_op = hrcl.pgsql.pgsql_operations(
         pgsql_url=psqldb_url,
         table_name=table_name,
         schema_name=schema_name,
-        init_cmd=f"""
+        init_query_cmd=f"""
         SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
         JOIN {schema_name}.protein_ligand__{table_name} plsf
-            ON plsf.pl_id = sf.{scoring_function}_id
+            ON plsf.{scoring_function}_id = sf.{scoring_function}_id
         JOIN {schema_name}.protein_ligand pl
             ON plsf.pl_id = pl.pl_id
-            WHERE pl.assay = (%s)
-            AND {col_check} IS NOT NULL
+            WHERE pl.assay = ('{assay}')
+            AND {col_check} IS NULL
         ;
     """,
         job_query_cmd=f"""
@@ -280,15 +279,15 @@ def vina_api_disco_dataset(
             WHERE sf.{scoring_function}_id = (%s)
                 ;
         """,
-        insert_cmd=f"""
-        INSERT INTO {schema_name}.{table_name} sf
-        ({", ".join(output_columns)}) VALUES 
-        ({", ".join(['%s'] * len(output_columns))})
+        update_cmd=f"""
+        UPDATE {schema_name}.{table_name} sf 
+        SET {set_columns}
         WHERE {scoring_function}_id = (%s)
         ;
         """
     )
     query = pgsql_op.init_query(con, assay)
+    print(query)
 
     print(f"Total number of jobs: {len(query)}")
 
@@ -300,11 +299,9 @@ def vina_api_disco_dataset(
         pgsql_op=pgsql_op,
         id_list=query,
         js_obj=jobspec.autodock_vina_disco_js,
-        headers_sql=jobspec.autodock_vina_disco_js_headers(),
         run_js_job=docking_inps.run_autodock_vina,
         extra_info=extra_info,
         id_label="id",
-        output_columns=output_columns,
         print_insertion=True,
     )
     return

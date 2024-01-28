@@ -5,6 +5,9 @@ from pprint import pprint as pp
 from dataclasses import dataclass
 from .jobspec import example_js
 from . import sqlt
+import os
+import subprocess
+import urllib
 
 
 @dataclass
@@ -45,13 +48,18 @@ class pgsql_operations:
         self.init_query_cmd = init_query_cmd
         self.job_query_cmd = job_query_cmd
         self.update_cmd = update_cmd
+        print(f"pgsql_operations initialized for {schema_name}.{table_name}")
+        print(f"init_query_cmd:\n    {init_query_cmd}")
+        print(f"job_query_cmd:\n    {job_query_cmd}")
+        print(f"update_cmd:\n    {update_cmd}")
 
     def init_query(self, conn, where_value):
         cur = conn.cursor()
+        print(self.init_query_cmd)
         cur.execute(self.init_query_cmd, (where_value,))
         return cur.fetchall()
 
-    def job_query(self, conn, id, js_obj):
+    def job_query(self, conn, id, js_obj, extra_info={}):
         cur = conn.cursor()
         if isinstance(id, list):
             cmd = self.job_query_cmd.replace("%s", f"{tuple(id)}")
@@ -61,6 +69,7 @@ class pgsql_operations:
         js_ls = [
             js_obj(
                 *i,
+                extra_info,
             )
             for i in cur.fetchall()
         ]
@@ -68,7 +77,10 @@ class pgsql_operations:
             return js_ls[0]
         return js_ls
 
-    def insert(self, conn, output, id_value):
+    def update(self, conn, output, id_value):
+        for i in range(len(output)):
+            if isinstance(output[i], np.ndarray):
+                output[i] = output[i].tolist()
         cur = conn.cursor()
         cur.execute(self.update_cmd, (*output, id_value))
         conn.commit()
@@ -330,15 +342,17 @@ def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
         cmd = "hostname -I | awk '{print $1}'"
         ip_db = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
         ip_db = f"{ip_db}:{port}"
+    else:
+        ip_db = f"{ip_db}:{port}"
 
-    psqldb = hrcl_jobs.pgsql.psqldb(
+    psqldb_local = psqldb(
         dbname=dbname,
         user=user,
         host=ip_db,
         password=pw,
     )
     pg_url = (
-        f"postgresql://{psqldb.user}:{psqldb.password}@{psqldb.host}/{psqldb.dbname}"
+        f"postgresql://{psqldb_local.user}:{psqldb_local.password}@{psqldb_local.host}/{psqldb_local.dbname}"
     )
     print(pg_url)
     return pg_url
