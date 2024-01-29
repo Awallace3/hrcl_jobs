@@ -62,7 +62,7 @@ def mda_selection_to_xyz(
     return g
 
 
-def run_apnet_discos_og(js: jobspec.apnet_disco_js) -> []:
+def run_apnet_discos_og(js: jobspec.apnet_pdbs_js) -> []:
     """
     Input columns:
         - PRO_PDB: str
@@ -148,7 +148,7 @@ def run_apnet_discos_og(js: jobspec.apnet_disco_js) -> []:
         return [None, None, None, None, None, str(e)]
     return update_values
 
-def run_apnet_discos(js: jobspec.apnet_disco_js) -> []:
+def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
     """
     Input columns:
         - PRO_PDB: str # ensure already protenated
@@ -226,7 +226,7 @@ def prepare_receptor4(receptor_filename, outputfilename):
     out = subprocess.run(cmd, shell=True, check=True)
 
 
-def run_autodock_vina(js: jobspec.autodock_vina_disco_js, verbose=1) -> []:
+def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
     """
     User must provide the following in js.extra_info:
     - sf_name: str

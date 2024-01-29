@@ -65,7 +65,7 @@ class pgsql_operations:
     def job_query(self, conn, id, js_obj, extra_info={}):
         cur = conn.cursor()
         if isinstance(id, list):
-            cmd = self.job_query_cmd.replace("%s", f"{tuple(id)}")
+            cmd = self.job_query_cmd.replace("= %s", f" IN {tuple(id)}")
             cur.execute(cmd)
         else:
             cur.execute(self.job_query_cmd, (id,))
@@ -339,6 +339,7 @@ def query_columns_for_values(
 
 
 def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
+    print(f"Connecting to {dbname} with {pw_source}")
     user_path_expand = os.path.expanduser(pw_source)
     with open(user_path_expand, "r") as f:
         data = f.readlines()

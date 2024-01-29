@@ -38,7 +38,7 @@ def vina_js_headers():
 
 
 @dataclass
-class apnet_disco_js:
+class apnet_pdbs_js:
     id_label: int
     PRO_PDB: str
     LIG_PDB: str
@@ -46,6 +46,7 @@ class apnet_disco_js:
     OTH_PDB: str
     PRO_CHARGE: int
     LIG_CHARGE: int
+    OTH_CHARGE: int
     extra_info: {}
     mem: str = None
 
@@ -62,7 +63,7 @@ def apnet_disco_js_headers():
     ]
 
 @dataclass
-class autodock_vina_disco_js:
+class autodock_vina_js:
     id_label: int
     PRO_PDB: str
     LIG_PDB: str
@@ -72,7 +73,7 @@ class autodock_vina_disco_js:
     mem: str = None
 
 
-def autodock_vina_disco_js_headers():
+def autodock_vina_js_headers():
     return [
         "id",
         "PRO_PDB",

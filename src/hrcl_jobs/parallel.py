@@ -64,7 +64,7 @@ def ms_sl_extra_info_pg(
     mpiexec -n 2 python3 -u main.py
     ```
     """
-    if len(id_list) == 0:
+    if id_list is not None and len(id_list) == 0:
         print("No ids to run")
         return
 
@@ -155,7 +155,6 @@ def ms_sl_extra_info_pg(
         print(f"rank: {rank}")
         s = time.time()
         js.extra_info = extra_info
-        js.mem = ppm
         output = run_js_job(js)
         output.append(js.id_label)
         output.append(rank)
@@ -167,7 +166,6 @@ def ms_sl_extra_info_pg(
             if js != 0:
                 print(f"rank: {rank}")
                 js.extra_info = extra_info
-                js.mem = ppm
                 output = run_js_job(js)
                 output.append(js.id_label)
                 output.append(rank)
