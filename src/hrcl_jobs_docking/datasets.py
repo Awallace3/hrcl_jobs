@@ -6,17 +6,16 @@ from . import jobspec
 
 
 def pgsql_op_ad4_vina_apnet(
-    psqldb_url, table_name, schema_name, scoring_function, assay, col_check, set_columns
+    psqldb_url, table_name, schema_name, scoring_function, assay, col_check, set_columns, system: str
 ):
+    system_pieces = system.split("_")
+    pro_name = system_pieces[0]
+    pro_pdb_col = f"pro_pdb"
+    if pro_name == "proteinHs":
+        pro_pdb_col = f"pro_pdb_hs"
+    print(f"Using {pro_pdb_col} column for pl query...")
+
     if scoring_function in ['vina', 'vinardo', 'ad4']:
-        job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
-            JOIN {schema_name}.protein_ligand__{table_name} plsf
-                ON plsf.{scoring_function}_id = sf.{scoring_function}_id
-            JOIN {schema_name}.protein_ligand pl
-                ON plsf.pl_id = pl.pl_id
-            WHERE sf.{scoring_function}_id = %s;
-        """ 
         init_query_cmd=f"""
         SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
         JOIN {schema_name}.protein_ligand__{table_name} plsf
@@ -24,17 +23,18 @@ def pgsql_op_ad4_vina_apnet(
         JOIN {schema_name}.protein_ligand pl
             ON plsf.pl_id = pl.pl_id
             WHERE pl.assay = ('{assay}')
+            AND sf.system = ('{system}')
             AND {col_check} IS NULL;
         """
-    elif scoring_function == 'apnet':
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.pro_pdb, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb, pl.pro_charge, pl.lig_charge, pl.oth_charge FROM {schema_name}.{table_name} sf
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
             JOIN {schema_name}.protein_ligand pl
                 ON plsf.pl_id = pl.pl_id
             WHERE sf.{scoring_function}_id = %s;
         """ 
+    elif scoring_function == 'apnet':
         init_query_cmd=f"""
         SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
@@ -45,8 +45,18 @@ def pgsql_op_ad4_vina_apnet(
                 AND {col_check} IS NULL 
                 AND pl.pro_charge IS NOT NULL
                 AND pl.lig_charge IS NOT NULL
-                AND pl.lig_pdb IS NOT NULL;
+                AND pl.lig_pdb IS NOT NULL
+                AND sf.system = ('{system}')
+                AND sf.apnet_errors is NULL;
         """
+        job_query_cmd = f"""
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb, pl.pro_charge, pl.lig_charge, pl.oth_charge FROM {schema_name}.{table_name} sf
+            JOIN {schema_name}.protein_ligand__{table_name} plsf
+                ON plsf.{scoring_function}_id = sf.{scoring_function}_id
+            JOIN {schema_name}.protein_ligand pl
+                ON plsf.pl_id = pl.pl_id
+            WHERE sf.{scoring_function}_id = %s
+        """ 
     else:
         raise ValueError(f"scoring function {scoring_function} not recognized")
 
@@ -71,6 +81,7 @@ def dataset_ad4_vina_apnet(
     table_name="vina",
     col_check="vina_total",
     assay="Kd",
+    system="proteinHs_ligand",
     hex=False,
     scoring_function="vina",
     extra_info={
@@ -116,8 +127,10 @@ def dataset_ad4_vina_apnet(
         print(f"{rank = } {memory_per_thread = } ")
 
     extra_info["sf_name"] = scoring_function
+    extra_info["mem_per_process"] = memory_per_thread
     extra_info["n_cpus"] = num_omp_threads
 
+    # JOBS
     if scoring_function in ["vina", "vinardo"]:
         output_columns = [
             f"{scoring_function}_total",
@@ -153,6 +166,7 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_disp",
             f"{scoring_function}_errors",
         ]
+        extra_info['atom_max'] = 15000
         js_obj = jobspec.apnet_pdbs_js
         run_js_job = docking_inps.run_apnet_pdbs
     else:
@@ -182,18 +196,20 @@ def dataset_ad4_vina_apnet(
         mode = hrcl.serial
         pgsql_op = pgsql_op_ad4_vina_apnet(
             psqldb_url, table_name, schema_name, scoring_function, assay,
-            col_check, set_columns
+            col_check, set_columns, system
         )
+        extra_info['identifier'] = 0
         query = pgsql_op.init_query(con, assay)
         query = [i[0] for i in query]
         print(f"Total number of jobs: {len(query)}, printing first 10")
         print(query[:10])
     else:
         mode = hrcl.parallel
+        extra_info['identifier'] = rank
         if rank == 0:
             pgsql_op = pgsql_op_ad4_vina_apnet(
                 psqldb_url, table_name, schema_name, scoring_function, assay,
-                col_check, set_columns
+                col_check, set_columns, system
             )
             query = pgsql_op.init_query(con, assay)
             query = [i[0] for i in query]

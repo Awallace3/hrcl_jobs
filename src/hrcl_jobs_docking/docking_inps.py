@@ -12,6 +12,7 @@ import qcelemental as qcel
 from pprint import pprint as pp
 import MDAnalysis as mda
 from MDAnalysis.exceptions import NoDataError
+import signal
 
 # docking specific imports
 from vina import Vina
@@ -48,6 +49,7 @@ def mda_selection_to_xyz_cm(
     g = np.concatenate((np.reshape(selection_elements, (-1, 1)), selection_xyz), axis=1)
     return g, cm
 
+
 def mda_selection_to_xyz(
     selection,
 ) -> (np.ndarray, np.ndarray):
@@ -62,91 +64,27 @@ def mda_selection_to_xyz(
     return g
 
 
-def run_apnet_discos_og(js: jobspec.apnet_pdbs_js) -> []:
+def compute_memory(memory_per_process):
     """
-    Input columns:
-        - PRO_PDB: str
-        - LIG_PDB: str
-        - WAT_PDB: str
-        - OTH_PDB: str
-    Output columns:
-        - apnet_totl_LIG: float
-        - apnet_elst_LIG: float
-        - apnet_exch_LIG: float
-        - apnet_indu_LIG: float
-        - apnet_disp_LIG: float
-        - apnet_errors: str
-    """
-    import apnet
+    Convert memory_per_process to bytes
+    NOTE: using the binary definition of (GB -> bytes) meaning 1 GB = 1024^3 bytes
 
-    pro_universe = mda.Universe(js.PRO_PDB)
-    lig_universe = mda.Universe(js.LIG_PDB)
-    # if wat_pdb is not None:
-    #     wat_universe = mda.Universe(js.WAT_PDB)
-    # if oth_pdb is not None:
-    #     oth_universe = mda.Universe(js.OTH_PDB)
-    # pro_xyz, pro_cm = mda_selection_to_xyz_cm(
-    #     pro_universe.select_atoms("protein and altloc A")
-    # )
-    # lig_xyz, lig_cm = mda_selection_to_xyz_cm(
-    #     lig_universe.select_atoms("not protein")
-    # )
-    try:
-        pro_xyz, pro_cm = mda_selection_to_xyz_cm(
-            pro_universe.select_atoms("protein and not altloc B")
-        )
-        if len(pro_xyz[:, 0]) == 0:
-            pro_xyz, pro_cm = mda_selection_to_xyz_cm(
-                pro_universe.select_atoms("protein")
-            )
-        lig_xyz, lig_cm = mda_selection_to_xyz_cm(
-            lig_universe.select_atoms("not protein")
-        )
-    except Exception as e:
-        e = "Could not read PDB"
-        return [None, None, None, None, None, str(e)]
-    mon_a = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
-        pro_xyz[:, 0], pro_xyz[:, 1:], only_results=True
-    )
-    mon_b = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
-        lig_xyz[:, 0], lig_xyz[:, 1:], only_results=True
-    )
-    apnet_error = None
-    print(js.PRO_PDB, js.LIG_PDB, len(pro_xyz[:, 0]), len(lig_xyz[:, 0]), sep="\n")
-    try:
-        geom = f"{pro_cm[0]} {pro_cm[1]}\n{mon_a}--\n{lig_cm[0]} {lig_cm[1]}\n{mon_b}\nunits angstrom\n"
-        mol = qcel.models.Molecule.from_data(geom)
-    except (Exception, ValueError) as e:
-        print(e)
-        lig_cm[1] = 2
-        geom = f"{pro_cm[0]} {pro_cm[1]}\n{mon_a}--\n{lig_cm[0]} {lig_cm[1]}\n{mon_b}\nunits angstrom\n"
-        try:
-            mol = qcel.models.Molecule.from_data(geom)
-        except (Exception, ValueError) as e:
-            apnet_error = e
-            print(apnet_error)
-            return [None, None, None, None, None, str(e)]
-    # prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
-    # print(prediction, uncertainty)
-    try:
-        print(mol)
-        prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
-        print(prediction, uncertainty)
-        prediction = prediction[0]
-        update_values = (
-            prediction[0],
-            prediction[1],
-            prediction[2],
-            prediction[3],
-            prediction[4],
-        )
-        update_values = [float(i) for i in update_values]
-        update_values.append(None)
-        print(update_values)
-    except Exception as e:
-        print(e)
-        return [None, None, None, None, None, str(e)]
-    return update_values
+    if an number is passed in, it is assumed to be in GB
+
+    """
+    if type(memory_per_process) == str:
+        if (
+            memory_per_process[-1].upper() == "G"
+            or memory_per_process[-2:].upper() == "GB"
+        ):
+            mem_value = "".join([i for i in memory_per_process if i.isdigit()])
+            memory_per_process = float(mem_value) * 1024 * 1024 * 1024
+        elif memory_per_process[-1] == "M":
+            memory_per_process = float(memory_per_process[:-1]) * 1024 * 1024
+    else:
+        memory_per_process = float(memory_per_process) * 1024 * 1024 * 1024
+    return memory_per_process
+
 
 def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
     """
@@ -164,14 +102,35 @@ def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
         - apnet_errors: str
     """
     import apnet
-    import tensorflow as tf 
-    tf.config.threading.set_intra_op_parallelism_threads(js.extra_info["n_cpus"])
-    tf.config.threading.set_inter_op_parallelism_threads(js.extra_info["n_cpus"])
-    pro_universe = mda.Universe(js.PRO_PDB)
-    lig_universe = mda.Universe(js.LIG_PDB)
-    print(f"{pro_universe} {js.PRO_PDB}", f"{lig_universe} {js.LIG_PDB}", sep="\n")
+    import tensorflow as tf
+
+    # tf.config.threading.set_intra_op_parallelism_threads(js.extra_info["n_cpus"])
+    # tf.config.threading.set_inter_op_parallelism_threads(js.extra_info["n_cpus"])
+    # gpus = tf.config.experimental.list_physical_devices('GPU')
+    physical_cpus = tf.config.experimental.list_physical_devices("CPU")
+    assert physical_cpus, "No CPUs were detected."
+    memory = compute_memory(js.extra_info["mem_per_process"])
+    assert memory, "No memory was detected."
+
+    # tf.config.threading.set_intra_op_parallelism_threads(0)
+    # tf.config.threading.set_inter_op_parallelism_threads(0)
+
+    if js.PRO_PDB is None:
+        return [None, None, None, None, None, "PRO_PDB is None"]
+    if js.LIG_PDB is None:
+        return [None, None, None, None, None, "LIG_PDB is None"]
+
     try:
-        pro_xyz = mda_selection_to_xyz(pro_universe.select_atoms("protein and not altloc B"))
+        pro_universe = mda.Universe(js.PRO_PDB)
+        lig_universe = mda.Universe(js.LIG_PDB)
+        print(f"{pro_universe} {js.PRO_PDB}", f"{lig_universe} {js.LIG_PDB}", sep="\n")
+        pro_xyz = mda_selection_to_xyz(
+            pro_universe.select_atoms("protein and not altloc B")
+        )
+        atom_count_protein = len(pro_xyz)
+        max_atoms = js.extra_info.get("atom_max", None)
+        if max_atoms is not None and atom_count_protein > max_atoms:
+            return [None, None, None, None, None, "atom_count_protein > atom_max"]
         lig_xyz = mda_selection_to_xyz(lig_universe.select_atoms("not protein"))
     except Exception as e:
         e = "Could not read PDB"
@@ -254,9 +213,19 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
         box_size = js.extra_info["sf_params"]["box_size"]
     else:
         box_size = [30, 30, 30]
+    identifier = js.extra_info.get("identifier", None)
+    if identifier is None:
+        identifier = "_0"
+    else:
+        identifier = f"_{identifier}"
     npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
     sf_name = js.extra_info["sf_name"]
     v = Vina(sf_name=sf_name, cpu=js.extra_info["n_cpus"], seed=875234)
+    if js.PRO_PDB is None:
+        return [None, None, None, None, None, None, None, "PRO_PDBQT is None"]
+    if js.LIG_PDB is None:
+        return [None, None, None, None, None, None, None, "LIG_PDBQT is None"]
+
     PRO_PDBQT = js.PRO_PDB + "qt"
     LIG_PDBQT = js.LIG_PDB + "qt"
     # WAT_PDBQT = js.WAT_PDB + "qt"
@@ -290,19 +259,23 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
             v.compute_vina_maps(center=com, box_size=box_size)
         elif sf_name == "ad4":
             os.chdir("/".join(PRO.split("/")[:-1]))
-            PRO = PRO.split("/")[-1]
+            PRO_MAP = PRO.split("/")[-1]
+            PRO = PRO_MAP + identifier
+
+            PRO_GPF = f"{PRO}.gpf"
+            PRO_GLG = f"{PRO}.glg"
+            print(f"{PRO_GPF = }")
             PRO_PDBQT = PRO_PDBQT.split("/")[-1]
             LIG_PDBQT = LIG_PDBQT.split("/")[-1]
-            if not os.path.exists(f"{PRO}.gpf"):
-                docking_tools_amw.prepare_gpf.prepare_gpf(
-                    receptor_filename=PRO_PDBQT,
-                    ligand_filename=LIG_PDBQT,
-                    output_gpf_filename=f"{PRO}.gpf",
-                    parameters=[npts_param],
-                )
-            if not os.path.exists(f"{PRO}.glg"):
-                cmd = f"autogrid4 -p {PRO}.gpf -l {PRO}.glg"
-                os.system(cmd)
+            docking_tools_amw.prepare_gpf.prepare_gpf(
+                receptor_filename=PRO_PDBQT,
+                ligand_filename=LIG_PDBQT,
+                output_gpf_filename=PRO_GPF,
+                parameters=[npts_param],
+                identifier=identifier,
+            )
+            cmd = f"autogrid4 -p {PRO_GPF} -l {PRO_GLG}"
+            os.system(cmd)
             v.load_maps(PRO)
         else:
             ad_vina_errors = "invalid sf_name"
@@ -315,8 +288,8 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
         energies = v.energies(n_poses=n_poses)
 
         if sf_name == "ad4":
-            # cmd = f"rm *.glg *.gpf *.map* "
-            # os.system(cmd)
+            cmd = f"rm {PRO_GPF} {PRO_GLG} {PRO}.map*"
+            os.system(cmd)
             os.chdir(def_dir)
 
     except Exception as e:
@@ -335,6 +308,8 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
         ]
     else:
         return [None, None, None, None, None, None, None, ad_vina_errors]
+
+
 # return data as a list in the following order (and typing)
 # "vina_total__LIG": "REAL",
 # "vina_inter__LIG": "REAL",
