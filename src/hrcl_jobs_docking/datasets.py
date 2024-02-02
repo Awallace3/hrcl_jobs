@@ -10,9 +10,13 @@ def pgsql_op_ad4_vina_apnet(
 ):
     system_pieces = system.split("_")
     pro_name = system_pieces[0]
-    pro_pdb_col = f"pro_pdb"
+    pro_pdb_col = f"pro_pdb_hs"
     if pro_name == "proteinHs":
         pro_pdb_col = f"pro_pdb_hs"
+    elif pro_name == 'proteinHsWater':
+        pro_pdb_col = "proteinhswat_pdb"
+    elif pro_name == 'proteinHsWaterOther':
+        pro_pdb_col = "proteinhswatoth_pdb"
     print(f"Using {pro_pdb_col} column for pl query...")
 
     if scoring_function in ['vina', 'vinardo', 'ad4']:
