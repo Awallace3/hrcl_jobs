@@ -16,6 +16,16 @@ import signal
 
 # docking specific imports
 from vina import Vina
+import signal
+
+
+class SegFault(Exception):
+    pass
+
+
+def segfault_handler(signum, frame):
+    print("segfault")
+    raise SegFault("segfault")
 
 
 class NumpyEncoder(json.JSONEncoder):
