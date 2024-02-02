@@ -10,13 +10,15 @@ def pgsql_op_ad4_vina_apnet(
 ):
     system_pieces = system.split("_")
     pro_name = system_pieces[0]
-    pro_pdb_col = f"pro_pdb_hs"
+    print(pro_name)
     if pro_name == "proteinHs":
         pro_pdb_col = f"pro_pdb_hs"
     elif pro_name == 'proteinHsWater':
         pro_pdb_col = "proteinhswat_pdb"
     elif pro_name == 'proteinHsWaterOther':
         pro_pdb_col = "proteinhswatoth_pdb"
+    else:
+        raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
 
     if scoring_function in ['vina', 'vinardo', 'ad4']:
@@ -26,9 +28,12 @@ def pgsql_op_ad4_vina_apnet(
             ON plsf.{scoring_function}_id = sf.{scoring_function}_id
         JOIN {schema_name}.protein_ligand pl
             ON plsf.pl_id = pl.pl_id
-            WHERE pl.assay = ('{assay}')
+        WHERE pl.assay = ('{assay}')
             AND sf.system = ('{system}')
-            AND {col_check} IS NULL;
+            AND {col_check} IS NULL
+            AND pl.{pro_pdb_col} IS NOT NULL
+            AND pl.lig_pdb IS NOT NULL
+            ;
         """
         job_query_cmd = f"""
         SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
@@ -49,6 +54,7 @@ def pgsql_op_ad4_vina_apnet(
                 AND {col_check} IS NULL 
                 AND pl.pro_charge IS NOT NULL
                 AND pl.lig_charge IS NOT NULL
+                AND pl.{pro_pdb_col} IS NOT NULL
                 AND pl.lig_pdb IS NOT NULL
                 AND sf.system = ('{system}')
                 AND sf.apnet_errors is NULL;
