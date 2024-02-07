@@ -10,13 +10,22 @@ def pgsql_op_ad4_vina_apnet(
 ):
     system_pieces = system.split("_")
     pro_name = system_pieces[0]
-    print(pro_name)
-    if pro_name == "proteinHs":
+    print(pro_name, system)
+    apnet_charge = "pro_charge"
+    if pro_name == "proteinHs" and system.endswith("PQR"):
+        pro_pdb_col = f"proteinhs_pdb"
+        apnet_charge = pro_pdb_col.replace("pdb", "charge")
+    elif pro_name.lower() == "proteinhs":
         pro_pdb_col = f"pro_pdb_hs"
     elif pro_name == 'proteinHsWater':
-        pro_pdb_col = "proteinhswat_pdb"
+        pro_pdb_col = "proteinhswater_pdb"
+        apnet_charge = pro_pdb_col.replace("pdb", "charge")
     elif pro_name == 'proteinHsWaterOther':
-        pro_pdb_col = "proteinhswatoth_pdb"
+        pro_pdb_col = "proteinhswaterother_pdb"
+        apnet_charge = pro_pdb_col.replace("pdb", "charge")
+    elif pro_name == 'proteinHsOther':
+        pro_pdb_col = "proteinhsother_pdb"
+        apnet_charge = pro_pdb_col.replace("pdb", "charge")
     else:
         raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
@@ -52,15 +61,17 @@ def pgsql_op_ad4_vina_apnet(
                 ON plsf.pl_id = pl.pl_id
             WHERE pl.assay = ('{assay}')
                 AND {col_check} IS NULL 
-                AND pl.pro_charge IS NOT NULL
+                AND pl.{apnet_charge} IS NOT NULL
                 AND pl.lig_charge IS NOT NULL
                 AND pl.{pro_pdb_col} IS NOT NULL
                 AND pl.lig_pdb IS NOT NULL
                 AND sf.system = ('{system}')
-                AND sf.apnet_errors is NULL;
+                AND sf.apnet_errors is NULL
+                ;
         """
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb, pl.pro_charge, pl.lig_charge, pl.oth_charge FROM {schema_name}.{table_name} sf
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb, pl.{apnet_charge}, pl.lig_charge, pl.oth_charge 
+            FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
             JOIN {schema_name}.protein_ligand pl
@@ -193,7 +204,8 @@ def dataset_ad4_vina_apnet(
         "disco_docking",
         "bmoad",
     ]
-    con, cur = hrcl.pgsql.connect(psqldb_url)
+    if not parallel or rank == 0:
+        con, cur = hrcl.pgsql.connect(psqldb_url)
     if table_name not in allowed_table_names:
         print(f"table_name must be one of {allowed_table_names}")
         return

@@ -119,8 +119,8 @@ def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
     # gpus = tf.config.experimental.list_physical_devices('GPU')
     physical_cpus = tf.config.experimental.list_physical_devices("CPU")
     assert physical_cpus, "No CPUs were detected."
-    memory = compute_memory(js.extra_info["mem_per_process"])
-    assert memory, "No memory was detected."
+    # memory = compute_memory(js.extra_info["mem_per_process"])
+    # assert memory, "No memory was detected."
 
     # tf.config.threading.set_intra_op_parallelism_threads(0)
     # tf.config.threading.set_inter_op_parallelism_threads(0)
@@ -133,35 +133,32 @@ def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
     try:
         pro_universe = mda.Universe(js.PRO_PDB)
         lig_universe = mda.Universe(js.LIG_PDB)
-        print(f"{pro_universe} {js.PRO_PDB}", f"{lig_universe} {js.LIG_PDB}", sep="\n")
         pro_xyz = mda_selection_to_xyz(
-            pro_universe.select_atoms("protein and not altloc B")
+            pro_universe.select_atoms("all and not altloc B")
         )
         atom_count_protein = len(pro_xyz)
         max_atoms = js.extra_info.get("atom_max", None)
         if max_atoms is not None and atom_count_protein > max_atoms:
             return [None, None, None, None, None, "atom_count_protein > atom_max"]
-        lig_xyz = mda_selection_to_xyz(lig_universe.select_atoms("not protein"))
+        lig_xyz = mda_selection_to_xyz(lig_universe.atoms)
+        pro_cm = [js.PRO_CHARGE, 1]
+        lig_cm = [js.LIG_CHARGE, 1]
+        print(f"{pro_universe} {js.PRO_CHARGE} {js.PRO_PDB}", f"{lig_universe} {js.LIG_CHARGE} {js.LIG_PDB}", sep="\n")
+        mon_a = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
+            pro_xyz[:, 0], pro_xyz[:, 1:], only_results=True
+        )
+        mon_b = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
+            lig_xyz[:, 0], lig_xyz[:, 1:], only_results=True
+        )
+        apnet_error = None
     except Exception as e:
         e = "Could not read PDB"
         return [None, None, None, None, None, str(e)]
-    pro_cm = [js.PRO_CHARGE, 1]
-    lig_cm = [js.LIG_CHARGE, 1]
-    mon_a = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
-        pro_xyz[:, 0], pro_xyz[:, 1:], only_results=True
-    )
-    mon_b = qm_tools_aw.tools.print_cartesians_pos_carts_symbols(
-        lig_xyz[:, 0], lig_xyz[:, 1:], only_results=True
-    )
-    apnet_error = None
     try:
         geom = f"{pro_cm[0]} {pro_cm[1]}\n{mon_a}--\n{lig_cm[0]} {lig_cm[1]}\n{mon_b}\nunits angstrom\n"
         mol = qcel.models.Molecule.from_data(geom)
-    except (Exception, ValueError) as e:
-        print(e)
-        return [None, None, None, None, None, str(e)]
-    try:
         print(mol)
+
         prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
         prediction = prediction[0]
         update_values = (
