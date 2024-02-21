@@ -1,8 +1,12 @@
 import warnings
 from . import sqlt
-from . import pgsql
 from . import serial
 from . import jobspec
+try:
+    from . import pgsql
+except ImportError:
+    warnings.warn("Could not import all modules from hrcl_jobs.pgsql (install psycopg2)")
+    pass
 try:
     from . import parallel
     from . import setup

@@ -42,11 +42,9 @@ class apnet_pdbs_js:
     id_label: int
     PRO_PDB: str
     LIG_PDB: str
-    WAT_PDB: str
-    OTH_PDB: str
     PRO_CHARGE: int
     LIG_CHARGE: int
-    OTH_CHARGE: int
+    system: str
     extra_info: {}
     mem: str = None
 
@@ -67,8 +65,8 @@ class autodock_vina_js:
     id_label: int
     PRO_PDB: str
     LIG_PDB: str
-    WAT_PDB: str
-    OTH_PDB: str
+    LIG_NAME: str
+    system: str
     extra_info: {}
     mem: str = None
 

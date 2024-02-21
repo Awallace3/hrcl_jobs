@@ -12,6 +12,7 @@ def pgsql_op_ad4_vina_apnet(
     pro_name = system_pieces[0]
     print(pro_name, system)
     apnet_charge = "pro_charge"
+    s = f"AND sf.system = ('{system}')"
     if pro_name == "proteinHs" and system.endswith("PQR"):
         pro_pdb_col = f"proteinhs_pdb"
         apnet_charge = pro_pdb_col.replace("pdb", "charge")
@@ -30,6 +31,7 @@ def pgsql_op_ad4_vina_apnet(
         raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
 
+
     if scoring_function in ['vina', 'vinardo', 'ad4']:
         init_query_cmd=f"""
         SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
@@ -38,14 +40,14 @@ def pgsql_op_ad4_vina_apnet(
         JOIN {schema_name}.protein_ligand pl
             ON plsf.pl_id = pl.pl_id
         WHERE pl.assay = ('{assay}')
-            AND sf.system = ('{system}')
+            {s}
             AND {col_check} IS NULL
             AND pl.{pro_pdb_col} IS NOT NULL
             AND pl.lig_pdb IS NOT NULL
             ;
         """
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb FROM {schema_name}.{table_name} sf
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.lig_name, sf.system FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
             JOIN {schema_name}.protein_ligand pl
@@ -65,12 +67,12 @@ def pgsql_op_ad4_vina_apnet(
                 AND pl.lig_charge IS NOT NULL
                 AND pl.{pro_pdb_col} IS NOT NULL
                 AND pl.lig_pdb IS NOT NULL
-                AND sf.system = ('{system}')
+                {s}
                 AND sf.apnet_errors is NULL
                 ;
         """
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.wat_pdb, pl.oth_pdb, pl.{apnet_charge}, pl.lig_charge, pl.oth_charge 
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.{apnet_charge}, pl.lig_charge, sf.system
             FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
@@ -159,7 +161,7 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_intra",
             f"{scoring_function}_torsion",
             f"{scoring_function}_intra_best_pose",
-            f"{scoring_function}_poses_pdbqt",
+            f"{scoring_function}_poses",
             f"{scoring_function}_all_poses",
             f"{scoring_function}_errors",
         ]
@@ -172,7 +174,7 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_intra",
             f"{scoring_function}_torsion",
             f"{scoring_function}_minus_intra",
-            f"{scoring_function}_poses_pdbqt",
+            f"{scoring_function}_poses",
             f"{scoring_function}_all_poses",
             f"{scoring_function}_errors",
         ]
