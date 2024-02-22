@@ -24,6 +24,15 @@ def example_run_js_job(js: example_js) -> float:
     v2 = js.val + 2
     return [v1, v2]
 
+def truncated_output(lst, max_length_str=30):
+    trunc_lst = []
+    for i in lst:
+        if isinstance(i, str) and len(i) > max_length_str:
+            trunc_lst.append(i[:max_length_str] + "...")
+        else:
+            trunc_lst.append(i)
+    return trunc_lst
+
 def ms_sl_extra_info_pg(
     pgsql_op: pgsql.pgsql_operations,
     id_list=[0, 50],
@@ -40,12 +49,14 @@ def ms_sl_extra_info_pg(
         output = run_js_job(js)
         insertion_str = ""
         if print_insertion:
-            insertion_str = f", output={output}"
+            tmp = truncated_output(output)
+            insertion_str = f", output={tmp}"
         print(f"\nMAIN: id {active_ind} inserted{insertion_str}\n")
         pgsql_op.update(conn, output, active_ind)
     print((time.time() - start) / 60, "Minutes")
     print("COMPLETED MAIN")
     return
+
 
 
 def ms_sl_extra_info(
@@ -93,7 +104,8 @@ def ms_sl_extra_info(
         output = run_js_job(js)
         insertion_str = ""
         if print_insertion:
-            insertion_str = f", output={output}"
+            tmp = truncated_output(output)
+            insertion_str = f", output={tmp}"
         print(f"\nMAIN: id {active_ind} inserted{insertion_str}\n")
         update_func(
             con,

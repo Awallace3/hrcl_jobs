@@ -44,6 +44,14 @@ class machineResources:
         self.omp_threads = omp_threads
 
 
+def truncated_output(lst, max_length_str=30):
+    trunc_lst = []
+    for i in lst:
+        if isinstance(i, str) and len(i) > max_length_str:
+            trunc_lst.append(i[:max_length_str] + "...")
+        else:
+            trunc_lst.append(i)
+    return trunc_lst
 
 
 def ms_sl_extra_info_pg(
@@ -121,7 +129,8 @@ def ms_sl_extra_info_pg(
             i2 = time.time() - i1
             insertion_str = ""
             if print_insertion:
-                insertion_str = f", output={output}"
+                tmp = truncated_output(output)
+                insertion_str = f", output={tmp}"
             print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nMAIN CLEANING UP PROCESSES\n")
         for n in range(n_procs - 1):
@@ -139,7 +148,8 @@ def ms_sl_extra_info_pg(
             comm.send(0, dest=target_proc, tag=2)
             insertion_str = ""
             if print_insertion:
-                insertion_str = f", output={output}"
+                tmp = truncated_output(output)
+                insertion_str = f", output={tmp}"
             print(f"\nMAIN: id {id_value} inserted{insertion_str}\n")
         print("\nCOMPLETED MAIN\n")
     else:

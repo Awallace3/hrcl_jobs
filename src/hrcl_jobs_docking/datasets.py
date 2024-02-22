@@ -6,7 +6,8 @@ from . import jobspec
 
 
 def pgsql_op_ad4_vina_apnet(
-    psqldb_url, table_name, schema_name, scoring_function, assay, col_check, set_columns, system: str
+    psqldb_url, table_name, schema_name, scoring_function, assay, col_check, set_columns, system: str,
+    testing=False,
 ):
     system_pieces = system.split("_")
     pro_name = system_pieces[0]
@@ -31,6 +32,9 @@ def pgsql_op_ad4_vina_apnet(
         raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
 
+    col_check_value = "IS NOT NULL" if testing else "IS NULL"
+    ORDER_BY = "ORDER BY pl.lig_atom_count, pl.pro_atom_count " if testing else ""
+
 
     if scoring_function in ['vina', 'vinardo', 'ad4']:
         init_query_cmd=f"""
@@ -41,13 +45,14 @@ def pgsql_op_ad4_vina_apnet(
             ON plsf.pl_id = pl.pl_id
         WHERE pl.assay = ('{assay}')
             {s}
-            AND {col_check} IS NULL
+            AND {col_check} {col_check_value}
             AND pl.{pro_pdb_col} IS NOT NULL
-            AND pl.lig_pdb IS NOT NULL
+            AND pl.lig_pdb_hs IS NOT NULL
+            {ORDER_BY}
             ;
         """
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.lig_name, sf.system FROM {schema_name}.{table_name} sf
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb_hs, pl.lig_name, sf.system FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
             JOIN {schema_name}.protein_ligand pl
@@ -62,17 +67,18 @@ def pgsql_op_ad4_vina_apnet(
             JOIN {schema_name}.protein_ligand pl
                 ON plsf.pl_id = pl.pl_id
             WHERE pl.assay = ('{assay}')
-                AND {col_check} IS NULL 
+                AND {col_check}  {col_check_value} 
                 AND pl.{apnet_charge} IS NOT NULL
                 AND pl.lig_charge IS NOT NULL
                 AND pl.{pro_pdb_col} IS NOT NULL
-                AND pl.lig_pdb IS NOT NULL
+                AND pl.lig_pdb_hs IS NOT NULL
                 {s}
                 AND sf.apnet_errors is NULL
+                {ORDER_BY}
                 ;
         """
         job_query_cmd = f"""
-        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb, pl.{apnet_charge}, pl.lig_charge, sf.system
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, pl.lig_pdb_hs, pl.{apnet_charge}, pl.lig_charge, sf.system
             FROM {schema_name}.{table_name} sf
             JOIN {schema_name}.protein_ligand__{table_name} plsf
                 ON plsf.{scoring_function}_id = sf.{scoring_function}_id
@@ -119,6 +125,8 @@ def dataset_ad4_vina_apnet(
         "num_omp_threads": 4,
     },
     parallel=True,
+    testing=False,
+    obabel_path="/path/to/obabel-3.1.1.1/bin/obabel"
 ):
     """
     Assumes postgresql database with schema_name:
@@ -161,11 +169,13 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_intra",
             f"{scoring_function}_torsion",
             f"{scoring_function}_intra_best_pose",
-            f"{scoring_function}_poses",
-            f"{scoring_function}_all_poses",
+            f"{scoring_function}_all_poses_pdbqt_str",
+            f"{scoring_function}_all_poses_energies",
+            f"{scoring_function}_best_pose_pdb_str",
             f"{scoring_function}_errors",
         ]
         js_obj = jobspec.autodock_vina_js
+        # run_js_job = docking_inps.run_autodock_vina
         run_js_job = docking_inps.run_autodock_vina
     elif scoring_function == "ad4":
         output_columns = [
@@ -174,8 +184,9 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_intra",
             f"{scoring_function}_torsion",
             f"{scoring_function}_minus_intra",
-            f"{scoring_function}_poses",
-            f"{scoring_function}_all_poses",
+            f"{scoring_function}_all_poses_pdbqt_str",
+            f"{scoring_function}_all_poses_energies",
+            f"{scoring_function}_best_pose_pdb_str",
             f"{scoring_function}_errors",
         ]
         js_obj = jobspec.autodock_vina_js
@@ -195,6 +206,8 @@ def dataset_ad4_vina_apnet(
     else:
         print("scoring function not recognized")
         return
+    if scoring_function in ["vina", "vinardo", "ad4"]:
+        extra_info["obabel_path"] = obabel_path
     print(f"{output_columns = }")
     allowed_table_names = [
         "vina",
@@ -215,30 +228,42 @@ def dataset_ad4_vina_apnet(
         print(f"schema_name must be one of {allowed_schemas}")
         return
     set_columns = ", ".join([f"{i} = %s" for i in output_columns])
+    if testing:
+        print(f"{testing = }")
 
     if not parallel:
         mode = hrcl.serial
         pgsql_op = pgsql_op_ad4_vina_apnet(
             psqldb_url, table_name, schema_name, scoring_function, assay,
-            col_check, set_columns, system
+            col_check, set_columns, system, testing,
         )
         extra_info['identifier'] = 0
         query = pgsql_op.init_query(con, assay)
         query = [i[0] for i in query]
+        if testing:
+            query = [query[0]]
         print(f"Total number of jobs: {len(query)}, printing first 10")
-        print(query[:10])
+        if len(query) > 10:
+            print(query[:10])
+        else:
+            print(query)
     else:
         mode = hrcl.parallel
         extra_info['identifier'] = rank
         if rank == 0:
             pgsql_op = pgsql_op_ad4_vina_apnet(
                 psqldb_url, table_name, schema_name, scoring_function, assay,
-                col_check, set_columns, system
+                col_check, set_columns, system, testing,
             )
             query = pgsql_op.init_query(con, assay)
             query = [i[0] for i in query]
+            if testing:
+                query = [query[0]]
             print(f"Total number of jobs: {len(query)}, printing first 10")
-            print(query[:10])
+            if len(query) > 10:
+                print(query[:10])
+            else:
+                print(query)
         else:
             pgsql_op = None
             query = None

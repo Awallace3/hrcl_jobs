@@ -192,7 +192,7 @@ def prepare_receptor4(receptor_filename, outputfilename):
     out = subprocess.run(cmd, shell=True, check=True)
 
 
-def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
+def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=0) -> []:
     """
     User must provide the following in js.extra_info:
     - sf_name: str
@@ -202,6 +202,8 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
     receptor_preparation.py
     """
     import docking_tools_amw
+    if verbose:
+        pp(js.__dict__)
 
     # try:
     if "n_poses" in js.extra_info.keys():
@@ -228,43 +230,37 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
     npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
     sf_name = js.extra_info["sf_name"]
     v = Vina(sf_name=sf_name, cpu=js.extra_info["n_cpus"], seed=875234)
-    # TODO: set_weights for vina and ad4
-    # need to run on docked structure single-point energy and collect
-    # v.set_weights([])
+
     if js.PRO_PDB is None:
-        return [None, None, None, None, None, None, None, "PRO_PDBQT is None"]
+        return [None, None, None, None, None, None, None, None, "PRO_PDBQT is None"]
     if js.LIG_PDB is None:
-        return [None, None, None, None, None, None, None, "LIG_PDBQT is None"]
+        return [None, None, None, None, None, None, None, None, "LIG_PDBQT is None"]
 
     PRO_PDBQT = js.PRO_PDB + "qt"
     LIG_PDBQT = js.LIG_PDB + "qt"
-    # WAT_PDBQT = js.WAT_PDB + "qt"
-    # OTH_PDBQT = js.OTH_PDB + "qt"
+    PRO_PDBQT = PRO_PDBQT.replace(".pdbqt", f"{identifier}.pdbqt")
+    LIG_PDBQT = LIG_PDBQT.replace(".pdbqt", f"{identifier}.pdbqt")
     PRO = PRO_PDBQT.replace(".pdbqt", "")
     def_dir = os.getcwd()
     try:
         if verbose:
             print(PRO_PDBQT, LIG_PDBQT, sep="\n")
-        if not os.path.exists(PRO_PDBQT):
-            docking_tools_amw.prepare_receptor4.prepare_receptor4(
-                receptor_filename=js.PRO_PDB,
-                outputfilename=PRO_PDBQT,
-                # charges_to_add=None,
-            )
-        if not os.path.exists(LIG_PDBQT):
-            docking_tools_amw.prepare_ligand4.prepare_ligand4(
-                ligand_filename=js.LIG_PDB,
-                outputfilename=LIG_PDBQT,
-                repairs="hydrogen",
-            )
+        docking_tools_amw.prepare_receptor4.prepare_receptor4(
+            receptor_filename=js.PRO_PDB,
+            outputfilename=PRO_PDBQT,
+            # charges_to_add=None,
+        )
+        docking_tools_amw.prepare_ligand4.prepare_ligand4(
+            ligand_filename=js.LIG_PDB,
+            outputfilename=LIG_PDBQT,
+            repairs="",
+        )
         # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
         com = get_com(js.LIG_PDB)
         # set the ligand
         ad_vina_errors = None
-        # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
         # NOTE: receptor must be set before ligand
         if sf_name in ["vina", "vinardo"]:
-            print(sf_name)
             v.set_receptor(PRO_PDBQT)
             v.compute_vina_maps(center=com, box_size=box_size)
         elif sf_name == "ad4":
@@ -274,7 +270,8 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
 
             PRO_GPF = f"{PRO}.gpf"
             PRO_GLG = f"{PRO}.glg"
-            print(f"{PRO_GPF = }")
+            if verbose:
+                print(f"{PRO_GPF = }")
             PRO_PDBQT = PRO_PDBQT.split("/")[-1]
             LIG_PDBQT = LIG_PDBQT.split("/")[-1]
             docking_tools_amw.prepare_gpf.prepare_gpf(
@@ -293,9 +290,22 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
 
         # docking
         v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
-        vina_out = LIG_PDBQT.replace(".pdbqt", f"{js.LIG_NAME.replace(':', '_')}_{js.system}_out.pdb")
-        v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
         energies = v.energies(n_poses=n_poses)
+
+        vina_out = LIG_PDBQT.replace(".pdbqt", f"_{sf_name}_{js.LIG_NAME.replace(':', '_')}_{js.system}_out.pdbqt")
+        obabel_out = vina_out.replace('.pdbqt', '_best.pdb')
+
+        if verbose:
+            print(f"{vina_out = }")
+            print(sf_best_pose_pdb_str)
+        v.write_poses(vina_out, n_poses=10, overwrite=True)
+        with open(vina_out, "r") as f:
+            sf_all_poses_pdbqt_str = f.read()
+        v.write_poses(vina_out, n_poses=1, overwrite=True)
+        obabel_cmd = f"{js.extra_info['obabel_path']} -ipdbqt {vina_out} -opdb -O{obabel_out}"
+        os.system(obabel_cmd)
+        with open(obabel_out, "r") as f:
+            sf_best_pose_pdb_str = f.read()
 
         if sf_name == "ad4":
             cmd = f"rm {PRO_GPF} {PRO_GLG} {PRO}.map*"
@@ -307,17 +317,18 @@ def run_autodock_vina(js: jobspec.autodock_vina_js, verbose=1) -> []:
         os.chdir(def_dir)
     if ad_vina_errors == None:
         return [
-            energies[0][0],
-            energies[0][1],
-            energies[0][2],
-            energies[0][3],
-            energies[0][4],
-            vina_out,
-            energies,
+            energies[0][0],         # total
+            energies[0][1],         # inter
+            energies[0][2],         # intra
+            energies[0][3],         # torsion
+            energies[0][4],         # intra_best_pose / minus_intra
+            sf_all_poses_pdbqt_str, # all_poses pdbqt as str
+            energies,               # all poses energies
+            sf_best_pose_pdb_str,   # best pose's pdb as str
             ad_vina_errors,
         ]
     else:
-        return [None, None, None, None, None, None, None, ad_vina_errors]
+        return [None, None, None, None, None, None, None, None, ad_vina_errors]
 
 def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
     """
@@ -329,6 +340,7 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
     receptor_preparation.py
     """
     import docking_tools_amw
+    pp(js.__dict__)
 
     # try:
     if "n_poses" in js.extra_info.keys():
@@ -355,6 +367,7 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
     npts_param = f"npts={npts[0]},{npts[1]},{npts[2]}"
     sf_name = js.extra_info["sf_name"]
     v = Vina(sf_name=sf_name, cpu=js.extra_info["n_cpus"], seed=875234)
+
     if js.PRO_PDB is None:
         return [None, None, None, None, None, None, None, "PRO_PDBQT is None"]
     if js.LIG_PDB is None:
@@ -362,39 +375,29 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
 
     PRO_PDBQT = js.PRO_PDB + "qt"
     LIG_PDBQT = js.LIG_PDB + "qt"
-    # WAT_PDBQT = js.WAT_PDB + "qt"
-    # OTH_PDBQT = js.OTH_PDB + "qt"
+    PRO_PDBQT = PRO_PDBQT.replace(".pdbqt", f"{identifier}.pdbqt")
+    LIG_PDBQT = LIG_PDBQT.replace(".pdbqt", f"{identifier}.pdbqt")
     PRO = PRO_PDBQT.replace(".pdbqt", "")
     def_dir = os.getcwd()
     try:
         if verbose:
             print(PRO_PDBQT, LIG_PDBQT, sep="\n")
-        if not os.path.exists(PRO_PDBQT):
-            docking_tools_amw.prepare_receptor4.prepare_receptor4(
-                receptor_filename=js.PRO_PDB,
-                outputfilename=PRO_PDBQT,
-                # charges_to_add=None,
-            )
-        # if not os.path.exists(LIG_PDBQT):
-        if os.path.exists(LIG_PDBQT):
-            docking_tools_amw.prepare_ligand4.prepare_ligand4(
-                ligand_filename=js.LIG_PDB,
-                outputfilename=LIG_PDBQT,
-                repairs="",
-                verbose=True,
-            )
-        return
-        u = mda.Universe(js.LIG_PDB)
-        print(u.atoms.positions)
-        print(u.atoms.elements)
+        docking_tools_amw.prepare_receptor4.prepare_receptor4(
+            receptor_filename=js.PRO_PDB,
+            outputfilename=PRO_PDBQT,
+            # charges_to_add=None,
+        )
+        docking_tools_amw.prepare_ligand4.prepare_ligand4(
+            ligand_filename=js.LIG_PDB,
+            outputfilename=LIG_PDBQT,
+            repairs="",
+            verbose=None,
+        )
         # find the center of the binding pocket, for this dataset that is also the center of mass of the ligand
         com = get_com(js.LIG_PDB)
-        # set the ligand
         ad_vina_errors = None
-        # if vina or vinardo then set the receptor and computer the vina maps, if autodock then prepare the gpf and autogrid
         # NOTE: receptor must be set before ligand
         if sf_name in ["vina", "vinardo"]:
-            print(sf_name)
             v.set_receptor(PRO_PDBQT)
             v.compute_vina_maps(center=com, box_size=box_size)
         elif sf_name == "ad4":
@@ -404,7 +407,8 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
 
             PRO_GPF = f"{PRO}.gpf"
             PRO_GLG = f"{PRO}.glg"
-            print(f"{PRO_GPF = }")
+            if verbose:
+                print(f"{PRO_GPF = }")
             PRO_PDBQT = PRO_PDBQT.split("/")[-1]
             LIG_PDBQT = LIG_PDBQT.split("/")[-1]
             docking_tools_amw.prepare_gpf.prepare_gpf(
@@ -423,10 +427,17 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
 
         # docking
         v.dock(exhaustiveness=exhaustiveness, n_poses=n_poses)
-        vina_out = LIG_PDBQT.replace(".pdbqt", f"{js.LIG_NAME.replace(':', '_')}_{js.system}_out.pdb")
-        v.write_poses(vina_out, n_poses=n_poses, overwrite=True)
-        poses = v.poses(n_poses=1, coordinates_only=True)
-        print(f"{poses = }")
+        vina_out = LIG_PDBQT.replace(".pdbqt", f"_{sf_name}_{js.LIG_NAME.replace(':', '_')}_{js.system}_out.pdbqt")
+        obabel_pdb = vina_out.replace('.pdbqt', '.pdb')
+        obabel_cmd = f"{js.extra_info['obabel_path']} -ipdbqt {vina_out} -opdb -O{obabel_pdb}"
+        v.write_poses(vina_out, n_poses=1, overwrite=True)
+        os.system(obabel_cmd)
+        if verbose:
+            u = mda.Universe(obabel_pdb)
+            print(f"{vina_out = }")
+            print(obabel_cmd)
+            print(f"{obabel_pdb = }")
+            print(u.atoms.positions)
         energies = v.energies(n_poses=n_poses)
 
         weighted_energies = []
@@ -451,9 +462,12 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
                 print(new_weights)
                 v.set_weights(new_weights)
                 print(v.info())
-                e = v.score()
+                e = v.score(n_poses=1)
+                print(e)
+                e = v.energies(n_poses=1)
                 print(e)
                 weighted_energies.append(e)
+            # TODO: add remove of pdbqt files
         elif sf_name == 'vinardo':
             vinardo_weights = [-0.045, 0.8, -0.035, -0.6, 50, 0.05846]
             for n, i in enumerate(vinardo_weights):
@@ -462,6 +476,7 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
                 v.set_weights(new_weighs)
                 e = v.energies(n_poses=1)
                 weighted_energies.append(e)
+            # TODO: add remove of pdbqt files
         print(f"{weighted_energies = }")
 
     except Exception as e:
@@ -482,12 +497,3 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js, verbose=1) -> []:
     else:
         return [None, None, None, None, None, None, None, ad_vina_errors]
 
-# return data as a list in the following order (and typing)
-# "vina_total__LIG": "REAL",
-# "vina_inter__LIG": "REAL",
-# "vina_intra__LIG": "REAL",
-# "vina_torsion__LIG": "REAL",
-# "vina_intra_best_pose__LIG": "REAL",
-# "vina_poses_pdbqt__LIG": "TEXT",
-# "vina_all_poses__LIG": "array",
-# "vina_errors__LIG": "TEXT",
