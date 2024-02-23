@@ -48,6 +48,18 @@ class apnet_pdbs_js:
     extra_info: {}
     mem: str = None
 
+@dataclass
+class apnet_pdb_sf_geom_js:
+    id_label: int
+    PRO_PDB: str
+    geometry_xyz: []
+    geometry_ele: []
+    PRO_CHARGE: int
+    LIG_CHARGE: int
+    system: str
+    extra_info: {}
+    mem: str = None
+
 
 def apnet_disco_js_headers():
     return [

@@ -7,7 +7,7 @@ from . import jobspec
 
 def pgsql_op_ad4_vina_apnet(
     psqldb_url, table_name, schema_name, scoring_function, assay, col_check, set_columns, system: str,
-    testing=False,
+    testing=False, sf_geom_origin=None
 ):
     system_pieces = system.split("_")
     pro_name = system_pieces[0]
@@ -32,8 +32,12 @@ def pgsql_op_ad4_vina_apnet(
         raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
 
-    col_check_value = "IS NOT NULL" if testing else "IS NULL"
-    ORDER_BY = "ORDER BY pl.lig_atom_count, pl.pro_atom_count " if testing else ""
+    col_check_value = "IS NULL" if testing else "IS NULL"
+    # If testing we want to get the smallest ligand-protein complex but in
+    # production we want to start with the largest ligand-protein complex
+    # computations first and then go to the smaller ones to ensure that towards
+    # the end each computation is more granularized
+    ORDER_BY = "ORDER BY pl.lig_atom_count, pl.pro_atom_count " if testing else "ORDER BY pl.pro_atom_count, pl.lig_atom_count DESC"
 
 
     if scoring_function in ['vina', 'vinardo', 'ad4']:
@@ -86,6 +90,35 @@ def pgsql_op_ad4_vina_apnet(
                 ON plsf.pl_id = pl.pl_id
             WHERE sf.{scoring_function}_id = %s
         """ 
+    elif scoring_function == 'apnet_sf':
+        init_query_cmd=f"""
+        SELECT sf.{scoring_function}_id FROM {schema_name}.{table_name} sf
+            JOIN {schema_name}.protein_ligand__{table_name} plsf
+                ON plsf.{scoring_function}_id = sf.{scoring_function}_id
+            JOIN {schema_name}.protein_ligand pl
+                ON plsf.pl_id = pl.pl_id
+            WHERE pl.assay = ('{assay}')
+                AND {col_check}  {col_check_value} 
+                AND pl.{apnet_charge} IS NOT NULL
+                AND pl.lig_charge IS NOT NULL
+                AND pl.{pro_pdb_col} IS NOT NULL
+                AND sf.geometry_xyz IS NOT NULL
+                AND sf.geometry_ele IS NOT NULL
+                AND sf.sf_geom_origin = '{sf_geom_origin}'
+                {s}
+                {ORDER_BY}
+                ;
+        """
+        job_query_cmd = f"""
+        SELECT sf.{scoring_function}_id, pl.{pro_pdb_col}, sf.geometry_xyz,
+        sf.geometry_ele, pl.{apnet_charge}, pl.lig_charge, sf.system
+            FROM {schema_name}.{table_name} sf
+            JOIN {schema_name}.protein_ligand__{table_name} plsf
+                ON plsf.{scoring_function}_id = sf.{scoring_function}_id
+            JOIN {schema_name}.protein_ligand pl
+                ON plsf.pl_id = pl.pl_id
+            WHERE sf.{scoring_function}_id = %s
+        """ 
     else:
         raise ValueError(f"scoring function {scoring_function} not recognized")
 
@@ -114,10 +147,16 @@ def dataset_ad4_vina_apnet(
     hex=False,
     scoring_function="vina",
     extra_info={
+        "verbosity": 0, # 0, 1, 2
         "sf_params": {
             "exhaustiveness": 32,
             "n_poses": 10,
             "npts": [54, 54, 54],
+            "sf_components": False,
+        },
+        "apnet": {
+            "atom_max": 30000,
+            "sf_geom_origin": None,
         },
     },
     hive_params={
@@ -161,6 +200,8 @@ def dataset_ad4_vina_apnet(
     extra_info["mem_per_process"] = memory_per_thread
     extra_info["n_cpus"] = num_omp_threads
 
+    sf_geom_origin = extra_info['apnet'].get('sf_geom_origin', None)
+
     # JOBS
     if scoring_function in ["vina", "vinardo"]:
         output_columns = [
@@ -175,7 +216,6 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_errors",
         ]
         js_obj = jobspec.autodock_vina_js
-        # run_js_job = docking_inps.run_autodock_vina
         run_js_job = docking_inps.run_autodock_vina
     elif scoring_function == "ad4":
         output_columns = [
@@ -191,7 +231,7 @@ def dataset_ad4_vina_apnet(
         ]
         js_obj = jobspec.autodock_vina_js
         run_js_job = docking_inps.run_autodock_vina
-    elif scoring_function == "apnet":
+    elif scoring_function == "apnet" or scoring_function == "apnet_sf":
         output_columns = [
             f"{scoring_function}_total",
             f"{scoring_function}_elst",
@@ -200,20 +240,30 @@ def dataset_ad4_vina_apnet(
             f"{scoring_function}_disp",
             f"{scoring_function}_errors",
         ]
-        extra_info['atom_max'] = 15000
-        js_obj = jobspec.apnet_pdbs_js
+        if not extra_info['apnet'].get('atom_max', False):
+            extra_info['apnet']['atom_max'] = 15000
         run_js_job = docking_inps.run_apnet_pdbs
+        js_obj = jobspec.apnet_pdbs_js
+        if scoring_function == "apnet_sf":
+            js_obj = jobspec.apnet_pdb_sf_geom_js
     else:
         print("scoring function not recognized")
         return
     if scoring_function in ["vina", "vinardo", "ad4"]:
         extra_info["obabel_path"] = obabel_path
+        js_obj = jobspec.autodock_vina_js
+        if extra_info['sf_params'].get('sf_components', False):
+            run_js_job = docking_inps.run_autodock_vina_components
+        else:
+            run_js_job = docking_inps.run_autodock_vina
+
     print(f"{output_columns = }")
     allowed_table_names = [
         "vina",
         "vinardo",
         "ad4",
         "apnet",
+        "apnet_sf",
     ]
     allowed_schemas = [
         "disco_docking",
@@ -235,7 +285,7 @@ def dataset_ad4_vina_apnet(
         mode = hrcl.serial
         pgsql_op = pgsql_op_ad4_vina_apnet(
             psqldb_url, table_name, schema_name, scoring_function, assay,
-            col_check, set_columns, system, testing,
+            col_check, set_columns, system, testing, sf_geom_origin
         )
         extra_info['identifier'] = 0
         query = pgsql_op.init_query(con, assay)
@@ -253,7 +303,8 @@ def dataset_ad4_vina_apnet(
         if rank == 0:
             pgsql_op = pgsql_op_ad4_vina_apnet(
                 psqldb_url, table_name, schema_name, scoring_function, assay,
-                col_check, set_columns, system, testing,
+                col_check, set_columns, system, testing, sf_geom_origin
+
             )
             query = pgsql_op.init_query(con, assay)
             query = [i[0] for i in query]

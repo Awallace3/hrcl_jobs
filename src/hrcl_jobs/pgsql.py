@@ -186,7 +186,8 @@ def create_junction_table(conn, cur, schema_name, t1_name, t1_id, t2_name, t2_id
         """
         )
         print(f"Creating junction table {schema_name}.{new_table_name}")
-    except psycopg2.Error:
+    except psycopg2.Error as e:
+        print("ERROR:", e)
         print(f"Table {schema_name}.{new_table_name} exists")
         conn.rollback()
     conn.commit()
