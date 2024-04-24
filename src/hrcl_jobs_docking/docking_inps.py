@@ -465,7 +465,9 @@ def run_autodock_vina_components(js: jobspec.autodock_vina_js) -> []:
                 new_weights = [0] * 6
                 new_weights[n] = i
                 print(f"{new_weights = }")
-                vina_cmd = f"vina --receptor {PRO_PDBQT} --ligand {LIG_PDBQT} --scoring vina --score_only --cpu {js.extra_info['n_cpus']} --weight_gauss1 {new_weights[0]} --weight_gauss2 {new_weights[1]} --weight_repulsion {new_weights[2]} --weight_hydrophobic {new_weights[3]} --weight_hydrogen {new_weights[4]} --weight_rot {new_weights[5]}"
+                vina_cmd = f"vina --receptor {PRO_PDBQT} --ligand {LIG_PDBQT} --scoring vina --autobox --score_only --cpu {js.extra_info['n_cpus']} --weight_gauss1 {new_weights[0]} --weight_gauss2 {new_weights[1]} --weight_repulsion {new_weights[2]} --weight_hydrophobic {new_weights[3]} --weight_hydrogen {new_weights[4]} --weight_rot {new_weights[5]}"
+
+                vina_cmd = f"vina --receptor {PRO_PDBQT} --ligand {LIG_PDBQT} --autobox --scoring vina --autobox --score_only --cpu {js.extra_info['n_cpus']} --weight_gauss1 {new_weights[0]}"
                 print(vina_cmd)
                 vina_cmd = vina_cmd.split(" ")
                 print(vina_cmd)

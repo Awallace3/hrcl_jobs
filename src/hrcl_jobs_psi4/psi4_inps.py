@@ -16,7 +16,7 @@ from pprint import pprint as pp
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
 """
-
+h2kcalmol = constants.conversion_factor("hartree", "kcal / mol")
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -512,7 +512,7 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
         handle_hrcl_extra_info_options(js, l)
-
+        do_ddft_d4 = "SAPT_DFT_DO_DDFT" in js.extra_info["options"].keys() and "SAPT_DFT_D4_IE" in js.extra_info["options"].keys()
         try:
             e = psi4.energy(f"{l}")
             e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -522,13 +522,85 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
             IND = psi4.core.variable("SAPT IND ENERGY")
             DISP = psi4.core.variable("SAPT DISP ENERGY")
             mult = constants.conversion_factor("hartree", "kcal / mol")
+            if do_ddft_d4:
+                DELTA_HF = psi4.core.variable("SAPT(DFT) DELTA HF") * mult 
+                DDFT = psi4.core.variable("SAPT(DFT) DELTA DFT") * mult 
+                D4_IE = psi4.core.variable("D4 IE") * mult
+                DFT_MONA = psi4.core.variable("DFT MONOMER A ENERGY")
+                DFT_MONB = psi4.core.variable("DFT MONOMER B ENERGY")
+                DFT_DIMER = psi4.core.variable("DFT DIMER ENERGY")
+                DFT_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult 
+                DFTD4_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult + D4_IE
             out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
         except Exception as e:
             print("Exception:", e)
             out_energies = None
         es.append(out_energies)
+        if do_ddft_d4:
+            es.append(DELTA_HF)
+            es.append(DDFT)
+            es.append(D4_IE)
+            es.append(DFT_IE)
         handle_hrcl_psi4_cleanup(js, l)
     return es
+
+def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    es = []
+    for l in js.extra_info["level_theory"]:
+        mol = psi4.geometry(geom)
+        print(l)
+        handle_hrcl_extra_info_options(js, l)
+        try:
+            e = psi4.energy(f"{l}")
+            e *= constants.conversion_factor("hartree", "kcal / mol")
+            ie = e
+            # ELST = psi4.core.variable("SAPT ELST ENERGY")
+            # EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+            # IND = psi4.core.variable("SAPT IND ENERGY")
+            # DISP = psi4.core.variable("SAPT DISP ENERGY")
+            mult = constants.conversion_factor("hartree", "kcal / mol")
+            out_energies = np.array([ie]) * mult
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
+        es.append(out_energies)
+        handle_hrcl_psi4_cleanup(js, l)
+    return
+
+
+def run_ccsd_t_CBS_IE(js: jobspec.saptdft_js) -> np.array:
+    """
+    Untested
+    """
+    generate_outputs = "out" in js.extra_info.keys()
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    cp = js.extra_info.get("CP", "NOCP")
+    es = []
+    for l in js.extra_info["level_theory"]:
+        mol = psi4.geometry(geom)
+        handle_hrcl_extra_info_options(js, l)
+        try:
+            e = psi4.energy(f"{l}", bsse_type=cp)
+            e *= constants.conversion_factor("hartree", "kcal / mol")
+            # ie = psi4.core.variable("SAPT(DFT) TOTAL ENERGY")
+            # ELST = psi4.core.variable("SAPT ELST ENERGY")
+            # EXCH = psi4.core.variable("SAPT EXCH ENERGY")
+            # IND = psi4.core.variable("SAPT IND ENERGY")
+            # DISP = psi4.core.variable("SAPT DISP ENERGY")
+            mult = constants.conversion_factor("hartree", "kcal / mol")
+            out_energies = np.array([e]) * mult
+        except Exception as e:
+            print("Exception:", e)
+            out_energies = None
+        es.append(out_energies)
+        handle_hrcl_psi4_cleanup(js, l)
+    return
 
 
 def run_psi4_saptdft(
@@ -856,10 +928,15 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
         mol = psi4.geometry(geom)
         e = psi4.energy(f"{l}")
         e *= constants.conversion_factor("hartree", "kcal / mol")
+        pp(psi4.core.variables())
         ELST = psi4.core.variable("SAPT ELST ENERGY")
         EXCH = psi4.core.variable("SAPT EXCH ENERGY")
         IND = psi4.core.variable("SAPT IND ENERGY")
-        DISP = psi4.core.variable("SAPT DISP ENERGY")
+        # NOTE: would need to get 'SAPT-D TOTAL ENERGY' if not doing sum here
+        if 'sapt0-d' in l.lower():
+            DISP = psi4.core.variable("DISPERSION CORRECTION ENERGY")
+        else:
+            DISP = psi4.core.variable("SAPT DISP ENERGY")
         ie = sum([ELST, EXCH, IND, DISP])
         mult = constants.conversion_factor("hartree", "kcal / mol")
         out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
@@ -1032,7 +1109,7 @@ def generate_job_dir(js, l, sub_job):
     return job_dir
 
 
-def handle_hrcl_extra_info_options(js, l, sub_job=0):
+def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False):
     psi4.set_memory(js.mem)
     psi4.set_options(js.extra_info["options"])
     generate_outputs = "out" in js.extra_info.keys()
@@ -1046,7 +1123,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
         psi4.core.print_out(f"{js}")
-    else:
+    elif psi4_quiet:
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
         psi4.set_num_threads(js.extra_info["num_threads"])
