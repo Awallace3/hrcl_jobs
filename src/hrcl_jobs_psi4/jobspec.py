@@ -184,6 +184,27 @@ def saptdft_js_headers():
         # "grac_shift_b",
     ]
 
+@dataclass
+class ccsd_t_CBS_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str
+
+
+def ccsd_T_CBS_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "monAs",
+        "monBs",
+        "charges",
+    ]
+
+
 
 @dataclass
 class saptdft_mon_grac_js:

@@ -32,7 +32,7 @@ def pgsql_op_ad4_vina_apnet(
         raise ValueError(f"system {system} not recognized")
     print(f"Using {pro_pdb_col} column for pl query...")
 
-    col_check_value = "IS NULL" if testing else "IS NULL"
+    col_check_value = "IS NOT NULL" if testing else "IS NULL"
     # If testing we want to get the smallest ligand-protein complex but in
     # production we want to start with the largest ligand-protein complex
     # computations first and then go to the smaller ones to ensure that towards
