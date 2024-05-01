@@ -1,5 +1,19 @@
+simple_basis_sets = [
+    "aug-cc-pvdz",
+    "aug-cc-pvtz",
+    "aug-cc-pvqz",
+    "jun-cc-pvdz",
+    "jun-cc-pvtz",
+    "cc-pvdz",
+    "cc-pvtz",
+    "may-cc-pvtz",
+]
+
 def get_basis_set(basis_str: str) -> str:
-    if basis_str == "adz":
+    basis_str = basis_str.lower()
+    if basis_str in simple_basis_sets:
+        return basis_str
+    elif basis_str == "adz":
         basis = "aug-cc-pvdz"
     elif basis_str == "atz":
         basis = "aug-cc-pvtz"

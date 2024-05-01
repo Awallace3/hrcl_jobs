@@ -12,6 +12,7 @@ import json
 from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
+from . import methods
 
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
@@ -400,7 +401,7 @@ def run_mp_js_grimme_no_df(js: grimme_js) -> np.array:
         ppm=js.mem,
         level_theory=js.level_theory,
         cp=True,
-        scf_type="pk"
+        scf_type="pk",
         # ma, mb, ppm=js.mem, level_theory=js.level_theory, cp=True, scf_type="cd"
     )
     return ies
@@ -707,6 +708,82 @@ def run_saptdft_no_grac(js: saptdft_js) -> np.array:
     return ies
 
 
+def run_GRAC_shift(
+    js: saptdft_js,
+) -> np.array:
+    """
+    run_dft_neutral_cation
+    """
+    from psi4.driver.procrouting import proc_util
+
+    generate_outputs = "out" in js.extra_info.keys()
+    extra_geom_info = js.extra_info.get("geometry_options", None)
+    geom = tools.generate_p4input_from_df(
+        js.geometry,
+        js.charges,
+        js.monAs,
+        js.monBs,
+        units="angstrom",
+        extra=extra_geom_info,
+    )
+    es = []
+    mol_dimer = psi4.geometry(geom)
+    _, mol_a, mol_b = proc_util.prepare_sapt_molecule(mol_dimer, "monomer")
+    out = []
+    for i in range(2):
+        if i == 0:
+            mol = mol_a
+        else:
+            mol = mol_b
+        mol_qcel_dict = mol.to_schema(dtype=2)
+        print(f"{mol_qcel_dict = }")
+        del mol_qcel_dict["fragment_charges"]
+        del mol_qcel_dict["fragment_multiplicities"]
+        del mol_qcel_dict["molecular_multiplicity"]
+        # Check if neutral, then cation is +1, if already cation then
+        mol_qcel_dict["molecular_charge"] += 1
+        print(f"{mol_qcel_dict = }")
+
+        mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+        mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
+
+        dft_functional = js.extra_info["options"].get("SAPT_DFT_FUNCTIONAL", "PBE0")
+        psi4_ref_start = js.extra_info["options"].get("reference", None)
+        js.extra_info["options"]["reference"] = "uhf"
+
+        if dft_functional is None:
+            raise ValueError("DFT functional not specified")
+        verbosity = js.extra_info.get("verbosity", None)
+        for l in js.extra_info["level_theory"]:
+            handle_hrcl_extra_info_options(js, l, "GRAC_A")
+            method, basis = methods.get_method_basis(l)
+            js.extra_info["options"]["basis"] = basis
+            if verbosity:
+                psi4.core.print_out(f"mol {{\n{geom}\n}}")
+            psi4.set_options(
+                {
+                    "reference": "uhf",
+                    "basis": basis,
+                }
+            )
+            e_neutral, wfn_n = psi4.energy(
+                dft_functional, return_wfn=True, molecule=mol
+            )
+            occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+                dense=True
+            )
+            HOMO = np.amax(occ_neutral)
+            e_cation, wfn = psi4.energy(
+                dft_functional, return_wfn=True, molecule=mol_cation
+            )
+            grac = e_cation - e_neutral + HOMO
+            print(f"{e_cation = } {l}\n{e_neutral = } {l}\n{HOMO = } {l}")
+            print(f"{grac = }")
+            out.append([e_neutral, e_cation, HOMO, grac])
+            handle_hrcl_psi4_cleanup(js, l)
+    return out
+
+
 def run_dft_neutral_cation(
     M, charges, ppm, level_theory, d_convergence="8"
 ) -> np.array:
@@ -847,12 +924,21 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it
     """
     generate_outputs = "out" in js.extra_info.keys()
+    extra_geom_info = js.extra_info.get("geometry_options", None)
     geom = tools.generate_p4input_from_df(
-        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+        js.geometry,
+        js.charges,
+        js.monAs,
+        js.monBs,
+        units="angstrom",
+        extra=extra_geom_info,
     )
     es = []
+    verbosity = js.extra_info.get("verbosity", None)
     for l in js.extra_info["level_theory"]:
         handle_hrcl_extra_info_options(js, l)
+        if verbosity:
+            psi4.core.print_out(f"mol {{\n{geom}\n}}")
         mol = psi4.geometry(geom)
         e = psi4.energy(f"{l}")
         e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -1037,6 +1123,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
     psi4.set_options(js.extra_info["options"])
     generate_outputs = "out" in js.extra_info.keys()
     set_scratch = "scratch" in js.extra_info.keys()
+    verbosity = js.extra_info.get("verbosity", None)
     if set_scratch:
         psi4.core.IOManager.shared_object().set_default_path(
             os.path.abspath(os.path.expanduser(js.extra_info["scratch"]["path"]))
@@ -1045,7 +1132,9 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0):
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
-        psi4.core.print_out(f"{js}")
+        psi4.core.print_out(f"\n{js}\n")
+        if verbosity:
+            psi4.core.print_out(f"set {{\n {js.extra_info.get('options', None)}\n}}")
     else:
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
@@ -1430,7 +1519,7 @@ def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
     if not generate_outputs:
         print("No output file specified. Not generating input files.")
     for l in js.extra_info["level_theory"]:
-        sub_job = js.extra_info['options']['pno_convergence']
+        sub_job = js.extra_info["options"]["pno_convergence"]
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
