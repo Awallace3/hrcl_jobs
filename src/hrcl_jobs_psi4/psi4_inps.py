@@ -513,7 +513,8 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
         handle_hrcl_extra_info_options(js, l)
-        do_ddft_d4 = "SAPT_DFT_DO_DDFT" in js.extra_info["options"].keys() and "SAPT_DFT_D4_IE" in js.extra_info["options"].keys()
+        do_ddft_d4 = js.extra_info["options"].get("SAPT_DFT_DO_DDFT", False) and js.extra_info["options"].get("SAPT_DFT_D4_IE", False)
+        print(f"{do_ddft_d4 = }")
         try:
             e = psi4.energy(f"{l}")
             e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -533,16 +534,17 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
                 DFT_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult 
                 DFTD4_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult + D4_IE
             out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
+            es.append(out_energies)
+            if do_ddft_d4:
+                es.append(DELTA_HF)
+                es.append(DDFT)
+                es.append(D4_IE)
+                es.append(DFT_IE)
         except Exception as e:
             print("Exception:", e)
             out_energies = None
-        es.append(out_energies)
-        if do_ddft_d4:
-            es.append(DELTA_HF)
-            es.append(DDFT)
-            es.append(D4_IE)
-            es.append(DFT_IE)
         handle_hrcl_psi4_cleanup(js, l)
+        print(f"{es = }")
     return es
 
 def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
@@ -813,9 +815,13 @@ def run_GRAC_shift(
         del mol_qcel_dict["fragment_multiplicities"]
         del mol_qcel_dict["molecular_multiplicity"]
         # Check if neutral, then cation is +1, if already cation then
-        mol_qcel_dict["molecular_charge"] += 1
-        print(f"{mol_qcel_dict = }")
+        # mol_qcel_dict["molecular_charge"] += 1
+        mol_qcel_dict["molecular_charge"] = 0
 
+        mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+        mol_neutral = psi4.core.Molecule.from_schema(mol_qcel.dict())
+
+        mol_qcel_dict["molecular_charge"] = 1
         mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
         mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
 
@@ -831,7 +837,7 @@ def run_GRAC_shift(
             method, basis = methods.get_method_basis(l)
             js.extra_info["options"]["basis"] = basis
             if verbosity:
-                psi4.core.print_out(f"mol {{\n{geom}\n}}")
+                psi4.core.print_out(f"mol_neutral {{\n{geom}\n}}")
             psi4.set_options(
                 {
                     "reference": "uhf",
@@ -839,7 +845,7 @@ def run_GRAC_shift(
                 }
             )
             e_neutral, wfn_n = psi4.energy(
-                dft_functional, return_wfn=True, molecule=mol
+                dft_functional, return_wfn=True, molecule=mol_neutral
             )
             occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
                 dense=True
@@ -1245,7 +1251,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     return
 
 
-def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
+def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force_neutral_cation=True):
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
     """
@@ -1255,14 +1261,31 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
     mn = tools.np_carts_to_string(mn)
     charges = js.charges[js.extra_info["charge_index"]]
     geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
-    geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
+    mol = psi4.geometry(geom_neutral)
+    mol_qcel_dict = mol.to_schema(dtype=2)
+    print(f"{mol_qcel_dict = }")
+    del mol_qcel_dict["fragment_charges"]
+    del mol_qcel_dict["fragment_multiplicities"]
+    del mol_qcel_dict["molecular_multiplicity"]
+    # Check if neutral, then cation is +1, if already cation then
+    # mol_qcel_dict["molecular_charge"] += 1
+    mol_qcel_dict["molecular_charge"] = 0
+
+    mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+    mol_neutral = psi4.core.Molecule.from_schema(mol_qcel.dict())
+
+    mol_qcel_dict["molecular_charge"] = 1
+    mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+    mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
+
+    # geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
     for l in js.extra_info["level_theory"]:
         # Neutral monomer energy
         sub_job = "neutral"
         try:
             handle_hrcl_extra_info_options(js, l, sub_job)
-            psi4.geometry(geom_neutral)
-            E_neutral, wfn_n = psi4.energy(l, return_wfn=True)
+            # psi4.geometry(geom_neutral)
+            E_neutral, wfn_n = psi4.energy(l, return_wfn=True, molecule=mol_neutral)
             occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
                 dense=True
             )
@@ -1274,8 +1297,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1):
             # Used to read in neutral density as guess for cation, investigate if breaks
             # js.extra_info["options"]["scf__guess"] = "read"
             handle_hrcl_extra_info_options(js, l, sub_job)
-            psi4.geometry(geom_cation)
-            E_cation, wfn_c = psi4.energy(l, return_wfn=True)
+            E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
             grac = E_cation - E_neutral + HOMO
             if grac >= 1 or grac <= 0:
                 print(f"{grac = }")
