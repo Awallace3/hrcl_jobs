@@ -1258,25 +1258,28 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force
     mn, out = [], []
     for i in js.monNs:
         mn.append(js.geometry[i, :])
-    mn = tools.np_carts_to_string(mn)
-    charges = js.charges[js.extra_info["charge_index"]]
-    geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
-    mol = psi4.geometry(geom_neutral)
-    mol_qcel_dict = mol.to_schema(dtype=2)
-    print(f"{mol_qcel_dict = }")
-    del mol_qcel_dict["fragment_charges"]
-    del mol_qcel_dict["fragment_multiplicities"]
-    del mol_qcel_dict["molecular_multiplicity"]
-    # Check if neutral, then cation is +1, if already cation then
-    # mol_qcel_dict["molecular_charge"] += 1
-    mol_qcel_dict["molecular_charge"] = 0
+    try:
+        mn = tools.np_carts_to_string(mn)
+        charges = js.charges[js.extra_info["charge_index"]]
+        geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
+        mol = psi4.geometry(geom_neutral)
+        mol_qcel_dict = mol.to_schema(dtype=2)
+        del mol_qcel_dict["fragment_charges"]
+        del mol_qcel_dict["fragment_multiplicities"]
+        del mol_qcel_dict["molecular_multiplicity"]
+        # Check if neutral, then cation is +1, if already cation then
+        # mol_qcel_dict["molecular_charge"] += 1
+        mol_qcel_dict["molecular_charge"] = 0
 
-    mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
-    mol_neutral = psi4.core.Molecule.from_schema(mol_qcel.dict())
+        mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+        mol_neutral = psi4.core.Molecule.from_schema(mol_qcel.dict())
 
-    mol_qcel_dict["molecular_charge"] = 1
-    mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
-    mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
+        mol_qcel_dict["molecular_charge"] = 1
+        mol_qcel = qcel.models.Molecule(**mol_qcel_dict)
+        mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
+    except Exception as e:
+        print(e)
+        return [[None, None, None, None] for _ in range(len(js.extra_info["level_theory"]))]
 
     # geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
     for l in js.extra_info["level_theory"]:
