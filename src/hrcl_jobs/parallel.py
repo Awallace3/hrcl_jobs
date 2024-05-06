@@ -205,6 +205,7 @@ def ms_sl_extra_info(
         "vac_vol_rat_B",
     ],
     print_insertion=False,
+    debug=False,
 ):
     """
     To use ms_sl properly, write your own run_js_job function along with an
@@ -354,6 +355,8 @@ def ms_sl_extra_info(
         s = time.time()
         js.extra_info = extra_info
         js.mem = ppm
+        if debug:
+            print(f"rank: {rank}, js.main_id: {js.id_label}")
         output = run_js_job(js)
         output.append(js.id_label)
         output.append(rank)
@@ -367,6 +370,8 @@ def ms_sl_extra_info(
                 print(f"rank: {rank}, js.main_id: {js.id_label}")
                 js.extra_info = extra_info
                 js.mem = ppm
+                if debug:
+                    print(f"rank: {rank}, js.main_id: {js.id_label}")
                 output = run_js_job(js)
                 output.append(js.id_label)
                 output.append(rank)

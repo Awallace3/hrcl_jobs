@@ -99,10 +99,12 @@ def table_add_columns(
     existing_table = {}
     for i in desc:
         existing_table[i[1]] = i[2]
+    print(f"{existing_table=}")
     for k, v in table_dict.items():
         if k not in existing_table.keys():
             print(f"Adding column {k} to {table_name}")
             con.execute(f"ALTER TABLE {table_name} ADD COLUMN {k} {v};")
+            con.commit()
     return True
 
 
@@ -659,7 +661,7 @@ def sqlt_execute(
         sql_cmd = f"""{action} {cols} FROM {table_name} {extra_action} {wm};"""
     else:
         sql_cmd = f"""{action} {cols} FROM {table_name};"""
-    print(sql_cmd)
+    # print(f"SQL_CMD: \n    {sql_cmd}")
     cur.execute(sql_cmd)
     val_list = [i for i in cur.fetchall()]
     for i in range(len(val_list)):
@@ -981,7 +983,6 @@ def delete_rows_by_search(
     return
 
 
-# TODO: test function
 def create_update_table(
     db_path: str,
     table_name: str,

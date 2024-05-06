@@ -19,6 +19,15 @@ from . import methods
 """
 h2kcalmol = constants.conversion_factor("hartree", "kcal / mol")
 
+import signal
+
+class SegFault(Exception):
+    pass
+
+def segfault_handler(signum, frame):
+    print("segfault")
+    raise SegFault("segfault")
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -540,7 +549,7 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
                 es.append(DDFT)
                 es.append(D4_IE)
                 es.append(DFT_IE)
-        except Exception as e:
+        except (Exception, SegFault) as e:
             print("Exception:", e)
             out_energies = None
         handle_hrcl_psi4_cleanup(js, l)

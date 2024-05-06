@@ -12,16 +12,14 @@ import qcelemental as qcel
 from pprint import pprint as pp
 import MDAnalysis as mda
 from MDAnalysis.exceptions import NoDataError
-import signal
 
 # docking specific imports
 from vina import Vina
 
 
+import signal
 class SegFault(Exception):
     pass
-
-
 def segfault_handler(signum, frame):
     print("segfault")
     raise SegFault("segfault")
