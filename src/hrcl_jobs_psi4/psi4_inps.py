@@ -1005,6 +1005,40 @@ def run_psi4_dimer_energy(
         psi4.core.clean()
     return es
 
+def options_dict_to_psi4_options(options):
+    replacements = ['"', "'"]
+    return str(options).replace("'", '').replace('"', '').replace(":", "=").replace(",", ",\n")
+
+def generate_energy_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    extra_geom_info = js.extra_info.get("geometry_options", None)
+    geom = tools.generate_p4input_from_df(
+        js.geometry,
+        js.charges,
+        js.monAs,
+        js.monBs,
+        units="angstrom",
+        extra=extra_geom_info,
+    )
+    es = []
+    verbosity = js.extra_info.get("verbosity", None)
+    generate_outputs = "out" in js.extra_info.keys()
+    set_scratch = "scratch" in js.extra_info.keys()
+    for l in js.extra_info["level_theory"]:
+        job_dir = generate_job_dir(js, l, sub_job=0)
+        os.makedirs(job_dir, exist_ok=True)
+        input_information = f"""
+memory {js.mem}
+
+set {options_dict_to_psi4_options(js.extra_info["options"])}
+
+molecule mol {{\n{geom}\n}}
+
+energy('{l}')
+"""
+        with open(f"{job_dir}/p4.in", "w") as f:
+            f.write(input_information)
+    return 
 
 def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     """
@@ -1025,7 +1059,16 @@ def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     for l in js.extra_info["level_theory"]:
         handle_hrcl_extra_info_options(js, l)
         if verbosity:
-            psi4.core.print_out(f"mol {{\n{geom}\n}}")
+            input_information = f"""
+memory {js.mem}
+
+set {options_dict_to_psi4_options(js.extra_info["options"])}
+
+molecule mol {{\n{geom}\n}}
+
+energy('{l}')
+"""
+            psi4.core.print_out(input_information)
         mol = psi4.geometry(geom)
         e = psi4.energy(f"{l}")
         e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -1237,7 +1280,7 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
         out_json = f"{job_dir}/{sub_job}_vars.json"
-        print(f"{out_json = }")
+        # print(f"{out_json = }")
         if os.path.exists(job_dir):
             with open(out_json, "w") as f:
                 out = psi4.core.variables()
