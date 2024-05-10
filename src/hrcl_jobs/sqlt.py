@@ -99,7 +99,7 @@ def table_add_columns(
     existing_table = {}
     for i in desc:
         existing_table[i[1]] = i[2]
-    print(f"{existing_table=}")
+    # print(f"{existing_table=}")
     for k, v in table_dict.items():
         if k not in existing_table.keys():
             print(f"Adding column {k} to {table_name}")
