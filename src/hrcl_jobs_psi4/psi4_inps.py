@@ -567,21 +567,23 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
     for l in js.extra_info["level_theory"]:
         mol = psi4.geometry(geom)
         handle_hrcl_extra_info_options(js, l)
-        # try:
-        dft_functional = l.split("/")[0]
-        dimer, monomerA, monomerB = proc_util.prepare_sapt_molecule(mol, "dimer")
-        dimer_d4, _ = dimer.run_dftd4(dft_functional, 'd4bjeeqatm')
-        monA_d4, _ = monomerA.run_dftd4(dft_functional, 'd4bjeeqatm')
-        monB_d4, _ = monomerB.run_dftd4(dft_functional, 'd4bjeeqatm')
-        d4_ie = (dimer_d4 - monA_d4 - monB_d4) * mult
-        dimer_e = psi4.energy(f"{l}", molecule=dimer)
-        monA_e = psi4.energy(f"{l}", molecule=monomerA)
-        monB_e = psi4.energy(f"{l}", molecule=monomerB)
-        dft_ie = (dimer_e - monA_e - monB_e) * mult
-        es.append(dft_ie)
-        es.append(d4_ie)
-        # except (Exception, SegFault) as e:
-        #     print("Exception:", e)
+        try:
+            dft_functional = l.split("/")[0]
+            dimer, monomerA, monomerB = proc_util.prepare_sapt_molecule(mol, "dimer")
+            dimer_d4, _ = dimer.run_dftd4(dft_functional, 'd4bjeeqatm')
+            monA_d4, _ = monomerA.run_dftd4(dft_functional, 'd4bjeeqatm')
+            monB_d4, _ = monomerB.run_dftd4(dft_functional, 'd4bjeeqatm')
+            d4_ie = (dimer_d4 - monA_d4 - monB_d4) * mult
+            dimer_e = psi4.energy(f"{l}", molecule=dimer)
+            monA_e = psi4.energy(f"{l}", molecule=monomerA)
+            monB_e = psi4.energy(f"{l}", molecule=monomerB)
+            dft_ie = (dimer_e - monA_e - monB_e) * mult
+            es.append(dft_ie)
+            es.append(d4_ie)
+        except (Exception, SegFault) as e:
+            print("Exception:", e)
+            es.append(None)
+            es.append(None)
         handle_hrcl_psi4_cleanup(js, l)
     print(f"{es = }")
     return es
