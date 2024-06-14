@@ -92,6 +92,47 @@ def compute_memory(memory_per_process):
         memory_per_process = float(memory_per_process) * 1024 * 1024 * 1024
     return memory_per_process
 
+def run_apnet_sapt0(js: jobspec.apnet_pdbs_js) -> []:
+    """
+    Input columns:
+    Output columns:
+    """
+    import apnet
+    import tensorflow as tf
+    tf.config.threading.set_inter_op_parallelism_threads(
+        js.extra_info["n_cpus"]
+    )
+
+
+    generate_outputs = "out" in js.extra_info.keys()
+    extra_geom_info = js.extra_info.get("geometry_options", None)
+    geom = qm_tools_aw.tools.generate_p4input_from_df(
+        js.geometry,
+        js.charges,
+        js.monAs,
+        js.monBs,
+        units="angstrom",
+        extra=extra_geom_info,
+    )
+    es = []
+    try:
+        mol = qcel.models.Molecule.from_data(geom)
+        print(mol)
+        prediction, uncertainty = apnet.predict_sapt(dimers=[mol])
+        prediction = prediction[0]
+        update_values = (
+            prediction[0],
+            prediction[1],
+            prediction[2],
+            prediction[3],
+            prediction[4],
+        )
+        update_values = [float(i) for i in update_values]
+        update_values.append(None)
+    except Exception as e:
+        print(e)
+        return [None, None, None, None, None, str(e)]
+    return update_values
 
 def run_apnet_pdbs(js: jobspec.apnet_pdbs_js) -> []:
     """

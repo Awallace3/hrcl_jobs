@@ -49,6 +49,25 @@ class apnet_pdbs_js:
     mem: str = None
 
 @dataclass
+class sapt_js:
+    id_label: int
+    geometry: np.array
+    monAs: np.array
+    monBs: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str
+
+def sapt_js_headers():
+    return [
+        "id",
+        "Geometry",
+        "monAs",
+        "monBs",
+        "charges",
+    ]
+
+@dataclass
 class apnet_pdb_sf_geom_js:
     id_label: int
     PRO_PDB: str

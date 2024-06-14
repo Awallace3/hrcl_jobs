@@ -1694,7 +1694,7 @@ def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
     return es
 
 
-def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
+def create_psi4_input_file(js: jobspec.sapt0_js, helper_code=True, input_type='psiapi', id=None) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -1703,15 +1703,32 @@ def create_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
     if not generate_outputs:
         print("No output file specified. Not generating input files.")
     for l in js.extra_info["level_theory"]:
-        sub_job = js.extra_info["options"]["pno_convergence"]
-        job_dir = generate_job_dir(js, l, sub_job)
+        # sub_job = js.extra_info["options"]["pno_convergence"]
+        job_dir = generate_job_dir(js, l, 0)
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
+        first = True
         for k, v in js.extra_info["options"].items():
-            opts += f"{k} {v}\n"
-        with open(f"{job_dir}/psi4.in", "w") as f:
-            f.write(
-                f"""
+            if not first:
+                opts += "\n"
+            else:
+                first = False
+            opts += f"    {k} {v}"
+        file_name = f"{job_dir}"
+        if id is not None:
+            id = f"_{id}"
+        else:
+            id = ""
+        if input_type == 'psiapi':
+            file_name += f"/psi4{id}.py"
+        elif input_type == 'psithon':
+            file_name += f"/psi4{id}.in"
+        elif input_type == 'qcschema':
+            file_name += f"/psi4{id}.json"
+        else:
+            raise ValueError(f"input_type {input_type} not recognized")
+
+        np_encoder = """
 import json
 import numpy as np
 
@@ -1720,24 +1737,48 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+        """ if helper_code else ""
+        save_results = """
 
-memory {js.mem}
+with open("vars.json", "w") as f:
+     json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
+     f.write(json_dump)
+        """ if helper_code else ""
+        if input_type == 'psiapi':
+            import pprint
+            options = pprint.pformat(js.extra_info['options'])
+            geom = f'"""{geom}"""'
+            input = f"""import psi4
 
+{np_encoder}
+psi4.set_memory('{js.mem}')
+
+mol = psi4.geometry({geom}) 
+
+psi4.set_options({options})
+
+{js.extra_info['function_call']}
+{save_results}"""
+            with open(file_name, "w") as f:
+                f.write(input)
+        elif input_type == "psithon":
+            input = f"""memory {js.mem}
+{np_encoder}
 molecule dimer {{
 {geom}
 no_com
 no_reorient
 }}
 set {{
-    {opts}
+{opts}
 }}
 
 {js.extra_info['function_call']}
-
-with open("vars.json", "w") as f:
-     json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
-     f.write(json_dump)
-
-        """
-            )
+{save_results}"""
+            with open(f"{job_dir}/psi4.in", "w") as f:
+                f.write(input)
+        elif input_type == "qcschema":
+            raise NotImplementedError()
+        else:
+            raise ValueError(f"input_type {input_type} not recognized")
     return [None for i in range(len(js.extra_info["level_theory"]))]
