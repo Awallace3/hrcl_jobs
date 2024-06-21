@@ -688,6 +688,7 @@ def query_columns_for_values(
     matches={
         "id": [0],
     },
+    return_dataframe=False,
 ) -> [int]:
     """
     return_id_list queries db for matches with column and returns id
@@ -696,7 +697,7 @@ def query_columns_for_values(
         id_name = id_names
     else:
         id_name = ", ".join(id_names)
-    if len(matches) > 0:
+    if matches and len(matches) > 0:
         where_match = []
         for k, v in matches.items():
             v = query_clean_match(v)
@@ -716,6 +717,8 @@ def query_columns_for_values(
         sql_cmd = f"""SELECT {id_name} FROM {table_name};"""
     print(sql_cmd)
     cur.execute(sql_cmd)
+    if return_dataframe:
+        return pd.DataFrame(cur.fetchall(), columns=id_names)
     val_list = [i for i in cur.fetchall()]
     for i in range(len(val_list)):
         if len(val_list[i]) == 1:

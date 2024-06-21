@@ -1072,6 +1072,33 @@ energy('{l}')
             f.write(input_information)
     return 
 
+def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
+    """
+    create_mp_js_grimme turns mp_js object into a psi4 job and runs it
+    """
+    generate_outputs = "out" in js.extra_info.keys()
+    extra_geom_info = js.extra_info.get("geometry_options", None)
+    geom = tools.generate_p4input_from_df(
+        js.geometry,
+        js.charges,
+        js.monAs,
+        js.monBs,
+        units="angstrom",
+        extra=extra_geom_info,
+    )
+    output = []
+    verbosity = js.extra_info.get("verbosity", None)
+    for l in js.extra_info["level_theory"]:
+        m, b = l.split("/")
+        handle_hrcl_extra_info_options(js, l)
+        mol = psi4.geometry(geom)
+        psi4.set_options({"basis": b})
+        wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
+        wert = wfn.basisset()
+        out_nbf_electrons = np.array([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+        output.append(out_nbf_electrons)
+    return output
+
 def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     """
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it

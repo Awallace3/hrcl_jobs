@@ -502,7 +502,7 @@ def dataset_ad4_vina_apnet_sql(
                 print(query)
         else:
             pgsql_op = None
-            query = None
+            query = [0]
 
     print(output_columns)
     mode.ms_sl_extra_info(
