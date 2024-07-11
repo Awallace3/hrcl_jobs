@@ -8,7 +8,14 @@ from . import sqlt
 import os
 import subprocess
 import urllib
+import io
+import zlib  # default compression is 6 on a ( 0-9 ) scale
 
+def convert_array(text):
+    out = io.BytesIO(text)
+    out.seek(0)
+    out = io.BytesIO(zlib.decompress(out.read()))
+    return np.load(out)
 
 @dataclass
 class example_js:
@@ -423,6 +430,55 @@ def is_float_series(series):
     except ValueError:
         return False
 
+
+def format_value_for_sql(value):
+    """
+    Format individual value for SQL insertion.
+    """
+    if isinstance(value, bytes):
+        print(value)
+        value = convert_array(value)
+    if isinstance(value, np.ndarray):
+        # Convert ndarray to PostgreSQL array literal; nump.ndarray already prints in correct nested format if more dimensional.
+        return f'{{ {str(value.tolist())[1:-1]} }}'
+    elif pd.isna(value):
+        return 'NULL'
+    elif isinstance(value, str):
+        return f"'{value}'"
+    elif isinstance(value, (np.integer, int)):
+        return str(value)
+    elif isinstance(value, (np.floating, float)):
+        return str(value)
+    elif isinstance(value, bool):
+        return str(value).upper()
+    elif isinstance(value, pd.Timestamp):
+        return f"'{value}'"
+    else:
+        raise ValueError(f"Unsupported value type: {type(value)}")
+
+def write_sql_file(df, table_name='my_table', file_name='output.sql'):
+    col_types = get_postgresql_column_types(df)
+    final_col_types = {}
+    for col, v in col_types.items():
+        if " " in col:
+            col = f'"{col}"'
+        final_col_types[col] = v
+
+    columns_definition = ",\n  ".join([f'{col} {dtype}' for col, dtype in final_col_types.items()])
+    
+    create_table_stmt = f'CREATE TABLE {table_name} (\n  {columns_definition}\n);'
+    
+    insert_into_stmts = []
+    for i, row in df.iterrows():
+        values = ", ".join([format_value_for_sql(value) for value in row])
+        insert_into_stmt = f'INSERT INTO {table_name} VALUES ({values});'
+        insert_into_stmts.append(insert_into_stmt)
+    
+    sql_statements = f'{create_table_stmt}\n\n' + "\n".join(insert_into_stmts)
+    
+    with open(file_name, 'w') as file:
+        file.write(sql_statements)
+
 def convert_to_sql(df, table_name, file_name=None, debug=False):
     create_table_statement = f"DROP TABLE IF EXISTS {table_name};\nCREATE TABLE {table_name} (\n"
     insert_into_statement = f"INSERT INTO {table_name} VALUES "
@@ -446,12 +502,11 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
             if value is None:
                 values.append("NULL")
             elif isinstance(value, list):
-                value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
-                # values.append("'" + value + "'")
+                value = "'" + str(value).replace('[', '{').replace(']', '}') + "'" # Convert list to PostgreSQL array format
                 values.append(value)
             elif isinstance(value, np.ndarray):
-                value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
-                # values.append("'" + value + "'")
+                # value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
+                value = f"'{{ {str(value.tolist())[1:-1].replace('[', '{').replace(']', '}')} }}'"
                 values.append(value)
             elif isinstance(value, str):
                 values.append("'" + value.replace("'", "''") + "'") # Escape single quotes in strings
@@ -470,4 +525,3 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
         with open(file_name, 'w') as f:
             f.write(sql_schema)
     return sql_schema
-
