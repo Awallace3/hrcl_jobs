@@ -1413,7 +1413,7 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force
             handle_hrcl_extra_info_options(js, l, sub_job)
             E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
             grac = E_cation - E_neutral + HOMO
-            if grac >= 1 or grac <= 0:
+            if grac >= 1 or grac <= -1:
                 print(f"{grac = }")
                 raise Exception("Grac appears wrong. Not inserting into DB.")
             if print_level < 3:

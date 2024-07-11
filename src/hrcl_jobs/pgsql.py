@@ -365,3 +365,109 @@ def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
     )
     print(pg_url)
     return pg_url
+
+def identify_array_dtype(array):
+    """
+    Identify the correct PostgreSQL type for numpy arrays.
+    """
+    if issubclass(array.dtype.type, np.integer):
+        return 'INTEGER'
+    elif issubclass(array.dtype.type, np.float_):
+        return 'DOUBLE PRECISION'
+    else:
+        raise ValueError(f"Array with unsupported data type {array.dtype}.")
+
+def get_postgresql_column_types(df):
+    type_mapping = {
+        'int64': 'INTEGER',
+        'float64': 'DOUBLE PRECISION',
+        'bool': 'BOOLEAN',
+        'datetime64[ns]': 'TIMESTAMP',
+    }
+
+    column_types = {}
+    
+    for col in df.columns:
+        col_dtype = df[col].dtype
+        
+        if col_dtype == 'object':
+            if df[col].apply(lambda x: isinstance(x, np.ndarray)).any():
+                # Determine the dimensionality
+                first_valid_value = df[col][df[col].apply(lambda x: isinstance(x, np.ndarray))].iloc[0]
+
+                array_dtype = identify_array_dtype(first_valid_value)
+                if first_valid_value.ndim == 1:
+                    column_types[col] = f'{array_dtype}[]'
+                elif first_valid_value.ndim == 2:
+                    column_types[col] = f'{array_dtype}[][]'
+                else:
+                    raise ValueError(f"Numpy array with more than 2 dimensions found in column '{col}'")
+            elif is_float_series(df[col]):
+                column_types[col] = 'DOUBLE PRECISION'
+            else:
+                column_types[col] = 'TEXT'
+        else:
+            col_str = str(col_dtype)
+            column_types[col] = type_mapping.get(col_str, 'TEXT')
+
+    return column_types
+
+def is_float_series(series):
+    """
+    Check if a series of dtype "object" actually contains float values.
+    """
+    try:
+        # Convert series to float and check if all values can be converted.
+        series.astype(float)
+        return True
+    except ValueError:
+        return False
+
+def convert_to_sql(df, table_name, file_name=None, debug=False):
+    create_table_statement = f"DROP TABLE IF EXISTS {table_name};\nCREATE TABLE {table_name} (\n"
+    insert_into_statement = f"INSERT INTO {table_name} VALUES "
+    insert_values = []
+    
+    column_definitions = []
+    column_types = get_postgresql_column_types(df)
+    for col, dtype in column_types.items():
+        if " " in col:
+            col = f'"{col}"'
+        column_definitions.append(f"{col} {dtype}")
+    print("CREATE TABLE statement:")
+    print(",\n".join(column_definitions))
+
+    create_table_statement += ",\n".join(column_definitions)
+    create_table_statement += "\n);"
+
+    for index, row in df.iterrows():
+        values = []
+        for col, value in row.items():
+            if value is None:
+                values.append("NULL")
+            elif isinstance(value, list):
+                value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
+                # values.append("'" + value + "'")
+                values.append(value)
+            elif isinstance(value, np.ndarray):
+                value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
+                # values.append("'" + value + "'")
+                values.append(value)
+            elif isinstance(value, str):
+                values.append("'" + value.replace("'", "''") + "'") # Escape single quotes in strings
+            else:
+                values.append(str(value))
+            if index==0 and debug:
+                print(col, value)
+        insert_values.append("(" + ", ".join(values) + ")")
+        if index == 0 and debug:
+            tmp = ",\n".join(insert_values) + ";"
+            print(tmp)
+    insert_into_statement += ",\n".join(insert_values) + ";"
+    
+    sql_schema = create_table_statement + "\n\n" + insert_into_statement
+    if file_name is not None:
+        with open(file_name, 'w') as f:
+            f.write(sql_schema)
+    return sql_schema
+
