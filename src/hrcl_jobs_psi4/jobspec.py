@@ -170,7 +170,7 @@ class saptdft_js:
     grac_shift_a: float
     grac_shift_b: float
     extra_info: {}
-    mem: str
+    mem: str = "8 gb"
 
 
 def saptdft_js_headers():
@@ -213,7 +213,7 @@ class saptdft_mon_grac_js:
     monNs: np.array
     charges: np.array
     extra_info: {}
-    mem: str
+    mem: str = "8 gb"
 
 
 def saptdft_mon_grac_js_headers(monNs="monAs"):

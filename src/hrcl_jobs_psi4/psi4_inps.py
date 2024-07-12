@@ -512,6 +512,10 @@ def run_psi4_sapt0(
 
 
 def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
+    if isinstance(js.geometry, list):
+        js.geometry = np.array(js.geometry)
+        js.monAs = np.array(js.monAs)
+        js.monBs = np.array(js.monBs)
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -523,7 +527,6 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
         handle_hrcl_extra_info_options(js, l)
         do_ddft_d4 = js.extra_info["options"].get("SAPT_DFT_DO_DDFT", False) and js.extra_info["options"].get("SAPT_DFT_D4_IE", False)
-        print(f"{do_ddft_d4 = }")
         try:
             e = psi4.energy(f"{l}")
             e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -1366,6 +1369,9 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
     """
+    if isinstance(js.geometry, list):
+        js.geometry = np.array(js.geometry)
+        js.monNs = np.array(js.monNs)
     mn, out = [], []
     for i in js.monNs:
         mn.append(js.geometry[i, :])

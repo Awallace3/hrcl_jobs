@@ -45,6 +45,7 @@ def ms_sl_extra_info_pg(
     first = True
     conn, cur = pgsql_op.connect_db()
     for n, active_ind in enumerate(id_list):
+        print(f"{active_ind=}")
         js = pgsql_op.job_query(conn, active_ind, js_obj, extra_info)
         output = run_js_job(js)
         insertion_str = ""

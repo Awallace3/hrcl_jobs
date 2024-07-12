@@ -72,13 +72,14 @@ def ms_sl_extra_info_pg(
     mpiexec -n 2 python3 -u main.py
     ```
     """
-    if id_list is not None and len(id_list) == 0:
-        print("No ids to run")
-        return
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     n_procs = comm.Get_size()
+
+    if id_list is not None and len(id_list) == 0:
+        print("No ids to run")
+        return
     print("rank", rank)
     if rank == 0:
         jobs = len(id_list)

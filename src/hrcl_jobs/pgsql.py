@@ -63,10 +63,13 @@ class pgsql_operations:
         print(f"job_query_cmd:\n    {job_query_cmd}")
         print(f"update_cmd:\n    {update_cmd}")
 
-    def init_query(self, conn, where_value):
+    def init_query(self, conn, where_value=None):
         cur = conn.cursor()
         print(self.init_query_cmd)
-        cur.execute(self.init_query_cmd, (where_value,))
+        if where_value is None:
+            cur.execute(self.init_query_cmd)
+        else:
+            cur.execute(self.init_query_cmd, (where_value,))
         return cur.fetchall()
 
     def job_query(self, conn, id, js_obj, extra_info={}):
@@ -499,7 +502,7 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
     for index, row in df.iterrows():
         values = []
         for col, value in row.items():
-            if value is None:
+            if value is None or isinstance(value, bytes):
                 values.append("NULL")
             elif isinstance(value, list):
                 value = "'" + str(value).replace('[', '{').replace(']', '}') + "'" # Convert list to PostgreSQL array format
@@ -525,3 +528,29 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
         with open(file_name, 'w') as f:
             f.write(sql_schema)
     return sql_schema
+
+def table_add_columns(
+    con: object,
+    table_name: str,
+    table_dict: dict,
+    debug: bool = True,
+) -> bool:
+    """
+    table_add_columns insert columns into a table.
+    """
+    cur = con.cursor()
+    cur.execute(f"select column_name, data_type from information_schema.columns where table_name='{table_name}'")
+    desc = cur.fetchall()
+    existing_table = {}
+    for i in desc:
+        existing_table[i[0]] = i[1]
+    if debug:
+        print(f"{existing_table=}")
+    for k, v in table_dict.items():
+        if k not in existing_table.keys():
+            if debug:
+                print(f"Adding column {k} to {table_name}")
+            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {k} {v};")
+            con.commit()
+    return True
+
