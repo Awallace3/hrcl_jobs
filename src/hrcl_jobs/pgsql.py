@@ -349,7 +349,7 @@ def query_columns_for_values(
     return val_list
 
 
-def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
+def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432, return_con=False):
     print(f"Connecting to {dbname} with {pw_source}")
     user_path_expand = os.path.expanduser(pw_source)
     with open(user_path_expand, "r") as f:
@@ -374,6 +374,10 @@ def connect_to_db(pw_source="file", dbname="disco", ip_db=None, port=5432):
         f"postgresql://{psqldb_local.user}:{psqldb_local.password}@{psqldb_local.host}/{psqldb_local.dbname}"
     )
     print(pg_url)
+    if return_con:
+        conn, _ = connect(pg_url)
+        print(conn)
+        return conn
     return pg_url
 
 def identify_array_dtype(array):
@@ -399,7 +403,6 @@ def get_postgresql_column_types(df):
     
     for col in df.columns:
         col_dtype = df[col].dtype
-        
         if col_dtype == 'object':
             if df[col].apply(lambda x: isinstance(x, np.ndarray)).any():
                 # Determine the dimensionality
@@ -412,6 +415,8 @@ def get_postgresql_column_types(df):
                     column_types[col] = f'{array_dtype}[][]'
                 else:
                     raise ValueError(f"Numpy array with more than 2 dimensions found in column '{col}'")
+            elif isinstance(df.iloc[0][col], bool):
+                column_types[col] = 'BOOLEAN'
             elif is_float_series(df[col]):
                 column_types[col] = 'DOUBLE PRECISION'
             else:
@@ -482,7 +487,9 @@ def write_sql_file(df, table_name='my_table', file_name='output.sql'):
     with open(file_name, 'w') as file:
         file.write(sql_statements)
 
-def convert_to_sql(df, table_name, file_name=None, debug=False):
+def convert_to_sql(df, table_name, file_name=None, debug=False, schema=None):
+    if schema is not None:
+        table_name = f'{schema}.{table_name}'
     create_table_statement = f"DROP TABLE IF EXISTS {table_name};\nCREATE TABLE {table_name} (\n"
     insert_into_statement = f"INSERT INTO {table_name} VALUES "
     insert_values = []
@@ -490,8 +497,8 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
     column_definitions = []
     column_types = get_postgresql_column_types(df)
     for col, dtype in column_types.items():
-        if " " in col:
-            col = f'"{col}"'
+        # if " " in col:
+        col = f'"{col}"'
         column_definitions.append(f"{col} {dtype}")
     print("CREATE TABLE statement:")
     print(",\n".join(column_definitions))
@@ -499,6 +506,57 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
     create_table_statement += ",\n".join(column_definitions)
     create_table_statement += "\n);"
 
+    for index, row in df.iterrows():
+        values = []
+        for col, value in row.items():
+            if value is None or isinstance(value, bytes):
+                values.append("NULL")
+            elif isinstance(value, list):
+                value = "'" + str(value).replace('[', '{').replace(']', '}') + "'" # Convert list to PostgreSQL array format
+                values.append(value)
+            elif isinstance(value, np.ndarray):
+                # value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
+                value = f"'{{ {str(value.tolist())[1:-1].replace('[', '{').replace(']', '}')} }}'"
+                values.append(value)
+            elif isinstance(value, str):
+                values.append("'" + value.replace("'", "''") + "'") # Escape single quotes in strings
+            elif isinstance(value, bool):
+                values.append(str(value).upper())
+            else:
+                values.append(str(value))
+            if index==0 and debug:
+                print(col, value)
+        insert_values.append("(" + ", ".join(values) + ")")
+        if index == 0 and debug:
+            tmp = ",\n".join(insert_values) + ";"
+            print(tmp)
+    insert_into_statement += ",\n".join(insert_values) + ";"
+    
+    sql_schema = create_table_statement + "\n\n" + insert_into_statement
+    if file_name is not None:
+        with open(file_name, 'w') as f:
+            f.write(sql_schema)
+    return sql_schema
+
+def generate_sql_file_info(df, table_name, foreign_keys=None, file_name=None, debug=False, schema=None):
+    table_name_start = table_name
+    if schema is not None:
+        table_name = f'{schema}.{table_name}'
+    create_table_statement = f"DROP TABLE IF EXISTS {table_name};\nCREATE TABLE {table_name} (\n"
+    insert_into_statement = f"INSERT INTO {table_name} VALUES "
+    insert_values = []
+    column_definitions = []
+    column_definitions.append(f"id_{table_name_start} SERIAL PRIMARY KEY")
+    column_types = get_postgresql_column_types(df)
+    for col, dtype in column_types.items():
+        if " " in col:
+            col = f'"{col}"'
+        column_definitions.append(f"{col} {dtype}")
+    if foreign_keys is not None:
+        for fk in foreign_keys:
+            column_definitions.append(f"FOREIGN KEY ({fk['main_col_ref']}) REFERENCES {fk['table']}({fk['reference']})")
+    create_table_statement += ",\n".join(column_definitions)
+    create_table_statement += "\n);"
     for index, row in df.iterrows():
         values = []
         for col, value in row.items():
@@ -522,8 +580,26 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
             tmp = ",\n".join(insert_values) + ";"
             print(tmp)
     insert_into_statement += ",\n".join(insert_values) + ";"
-    
-    sql_schema = create_table_statement + "\n\n" + insert_into_statement
+    return create_table_statement, insert_into_statement
+
+def convert_to_sql_multiple_dfs(main_df, dfs, table_name, file_name=None, debug=False, schema=None):
+    foriegn_keys = []
+    table_creations = ""
+    all_insertions = ""
+    for k, v in dfs.items():
+        df = v['df']
+        extra_table = f"{schema}_{k}"
+        table_info, insertions = generate_sql_file_info(df, extra_table, file_name=None, debug=False, schema=schema)
+        foriegn_keys.append({"main_col_ref": f"{extra_table}_fk", "table": extra_table, "reference": v['ref_col']})
+        table_creations += table_info + "\n\n"
+        all_insertions += insertions + "\n\n"
+        # need to create foreign tables first but insertaions of foreign tables last
+
+    main_table_info, main_insertions = generate_sql_file_info(main_df, table_name, foriegn_keys, file_name=None, debug=False, schema=schema)
+    table_creations += main_table_info + "\n\n"
+    # all_insertions = main_insertions + "\n\n" + all_insertions
+    all_insertions += main_insertions  + "\n\n"
+    sql_schema = table_creations + all_insertions
     if file_name is not None:
         with open(file_name, 'w') as f:
             f.write(sql_schema)
@@ -532,25 +608,33 @@ def convert_to_sql(df, table_name, file_name=None, debug=False):
 def table_add_columns(
     con: object,
     table_name: str,
+    schema_name: str,
     table_dict: dict,
     debug: bool = True,
 ) -> bool:
     """
     table_add_columns insert columns into a table.
+    NOTE: don't use schema.table_name, but just table_name for cmd.
     """
+    if schema_name is not None and not schema_name.endswith('.'):
+        schema_name += "."
     cur = con.cursor()
-    cur.execute(f"select column_name, data_type from information_schema.columns where table_name='{table_name}'")
+    cmd = f"select column_name, data_type from information_schema.columns where table_name='{table_name}'"
+    cur.execute(cmd)
     desc = cur.fetchall()
     existing_table = {}
     for i in desc:
         existing_table[i[0]] = i[1]
     if debug:
+        print(f"{table_name = }")
+        print(f"{cmd = }")
         print(f"{existing_table=}")
+        pp(existing_table.keys())
     for k, v in table_dict.items():
-        if k not in existing_table.keys():
+        if k.replace('"', "") not in existing_table.keys():
             if debug:
-                print(f"Adding column {k} to {table_name}")
-            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {k} {v};")
+                print(f"Adding column {k} to {schema_name}{table_name}")
+            cur.execute(f"ALTER TABLE {schema_name}{table_name} ADD COLUMN {k} {v};")
             con.commit()
     return True
 
