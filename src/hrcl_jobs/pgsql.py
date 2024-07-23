@@ -51,6 +51,7 @@ class pgsql_operations:
         init_query_cmd,
         job_query_cmd: str,
         update_cmd: str,
+        id_label: str = "id",
     ):
         self.pgsql_url = pgsql_url
         self.table_name = table_name
@@ -58,19 +59,25 @@ class pgsql_operations:
         self.init_query_cmd = init_query_cmd
         self.job_query_cmd = job_query_cmd
         self.update_cmd = update_cmd
+        self.id_label = id_label
         print(f"pgsql_operations initialized for {schema_name}.{table_name}")
         print(f"init_query_cmd:\n    {init_query_cmd}")
         print(f"job_query_cmd:\n    {job_query_cmd}")
         print(f"update_cmd:\n    {update_cmd}")
 
-    def init_query(self, conn, where_value=None):
+    def init_query(self, conn, where_value=None, sort_by=None, ascending=True, ids_only=True):
         cur = conn.cursor()
         print(self.init_query_cmd)
         if where_value is None:
             cur.execute(self.init_query_cmd)
         else:
             cur.execute(self.init_query_cmd, (where_value,))
-        return cur.fetchall()
+        df = pd.DataFrame(cur.fetchall(), columns=[desc[0] for desc in cur.description])
+        if sort_by is not None:
+            df = df.sort_values(by=sort_by, ascending=ascending)
+        if ids_only:
+            return df[self.id_label].tolist()
+        return df
 
     def job_query(self, conn, id, js_obj, extra_info={}):
         cur = conn.cursor()
@@ -79,13 +86,24 @@ class pgsql_operations:
             cur.execute(cmd)
         else:
             cur.execute(self.job_query_cmd, (id,))
-        js_ls = [
-            js_obj(
-                *i,
-                extra_info,
-            )
-            for i in cur.fetchall()
-        ]
+        # see if 'mem' is attribute of js_obj and extra_info has key 'mem_per_process'
+        if hasattr(js_obj, "mem") and "mem_per_process" in extra_info.keys():
+            js_ls = [
+                js_obj(
+                    *i,
+                    extra_info,
+                    extra_info["mem_per_process"],
+                )
+                for i in cur.fetchall()
+            ]
+        else:
+            js_ls = [
+                js_obj(
+                    *i,
+                    extra_info,
+                )
+                for i in cur.fetchall()
+            ]
         if len(js_ls) == 0:
             raise jobQuery(f"No jobs found for {id}")
         elif len(js_ls) == 1:
@@ -95,12 +113,34 @@ class pgsql_operations:
         return js_ls
 
     def update(self, conn, output, id_value):
-        for i in range(len(output)):
-            if isinstance(output[i], np.ndarray):
-                output[i] = output[i].tolist()
-        cur = conn.cursor()
-        cur.execute(self.update_cmd, (*output, id_value))
-        conn.commit()
+        # if len(output_columns) != len(output):
+        #     print("OUTPUT_COLUMNS AND OUTPUT MUST BE THE SAME LENGTH!", id_value)
+        #     return
+        # headers = ",\n".join([f"{i} = ?" for i in output_columns])
+        # cmd = f"""
+        #     UPDATE {table}
+        #     SET
+        #         {headers}
+        #     WHERE
+        #         {id_label}=?;
+        # """
+        # if not insert_none:
+        #     for i in output:
+        #         if i is None:
+        #             print(f"None in output, skipping {id_value}: {output = }...")
+        #             return
+        try:
+            for i in range(len(output)):
+                if isinstance(output[i], np.ndarray):
+                    output[i] = output[i].tolist()
+            if len(output) < 1:
+                print("No output to update")
+                return 
+            cur = conn.cursor()
+            cur.execute(self.update_cmd, (*output, id_value))
+            conn.commit()
+        except (Exception) as e:
+            print(f"Error updating {id_value}: {e}")
         return
     
     def connect_db(self):
