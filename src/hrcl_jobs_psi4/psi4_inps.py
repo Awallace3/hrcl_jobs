@@ -19,14 +19,21 @@ from . import methods
 """
 h2kcalmol = constants.conversion_factor("hartree", "kcal / mol")
 
+# Seg Fault Handler
 import signal
+# import faulthandler
+#
+# faulthandler.enable()
+
 
 class SegFault(Exception):
     pass
 
-def segfault_handler(signum, frame):
-    print("segfault")
-    raise SegFault("segfault")
+# def handler(sigNum, frame):
+#     print("segfault captured. Moving onto next computation.")
+#
+# signal.signal(signal.SIGSEGV, handler)
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -526,7 +533,9 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
         handle_hrcl_extra_info_options(js, l)
-        do_ddft_d4 = js.extra_info["options"].get("SAPT_DFT_DO_DDFT", False) and js.extra_info["options"].get("SAPT_DFT_D4_IE", False)
+        do_ddft_d4 = js.extra_info["options"].get(
+            "SAPT_DFT_DO_DDFT", False
+        ) and js.extra_info["options"].get("SAPT_DFT_D4_IE", False)
         try:
             e = psi4.energy(f"{l}")
             e *= constants.conversion_factor("hartree", "kcal / mol")
@@ -537,13 +546,13 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
             DISP = psi4.core.variable("SAPT DISP ENERGY")
             mult = constants.conversion_factor("hartree", "kcal / mol")
             if do_ddft_d4:
-                DELTA_HF = psi4.core.variable("SAPT(DFT) DELTA HF") * mult 
-                DDFT = psi4.core.variable("SAPT(DFT) DELTA DFT") * mult 
+                DELTA_HF = psi4.core.variable("SAPT(DFT) DELTA HF") * mult
+                DDFT = psi4.core.variable("SAPT(DFT) DELTA DFT") * mult
                 D4_IE = psi4.core.variable("D4 IE") * mult
                 DFT_MONA = psi4.core.variable("DFT MONOMER A ENERGY")
                 DFT_MONB = psi4.core.variable("DFT MONOMER B ENERGY")
                 DFT_DIMER = psi4.core.variable("DFT DIMER ENERGY")
-                DFT_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult 
+                DFT_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult
                 DFTD4_IE = (DFT_DIMER - DFT_MONA - DFT_MONB) * mult + D4_IE
             out_energies = np.array([ie, ELST, EXCH, IND, DISP]) * mult
             es.append(out_energies)
@@ -556,8 +565,92 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
             print("Exception:", e)
             out_energies = None
         handle_hrcl_psi4_cleanup(js, l)
-        print(f"{es = }")
     return es
+
+
+def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    if isinstance(js.geometry, list):
+        js.geometry = np.array(js.geometry)
+        js.monAs = np.array(js.monAs)
+        js.monBs = np.array(js.monBs)
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+    )
+    es = []
+    bsse_type = js.extra_info.get("bsse_type", "CP")
+
+    mult = constants.conversion_factor("hartree", "kcal / mol")
+    for l in js.extra_info["level_theory"]:
+        paren_t = "(t)" in l.lower()
+        disp_correction = "DISPERSION_CORRECTION" in js.extra_info["options"].keys()
+        mol = psi4.geometry(geom)
+        job_dir = handle_hrcl_extra_info_options(js, l)
+        try:
+        # should be using git@github.com:Awallace3/psi4.git -b dlpno_ccsd_t_upstream
+            output_information = f"{os.getcwd()}/{job_dir}/many_body.out"
+            os.environ["PSI4_MANY_BODY_OUTPUT"] = output_information
+            ie = psi4.energy(f"{l}", bsse_type=bsse_type)
+            data = tools.json_to_dict(output_information)
+            es.append(ie)
+            es.append(
+                np.array(
+                    [
+                        # dimer, monomerA, monomerB
+                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
+                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
+                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
+                    ]
+                )
+            )
+            es.append(
+                np.array(
+                    [
+                        # dimer, monomerA, monomerB
+                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
+                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
+                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
+                    ]
+                )
+            )
+            if paren_t:
+                es.append(
+                    np.array(
+                        [
+                            # dimer, monomerA, monomerB
+                            data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
+                            data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
+                            data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
+                        ]
+                    )
+                )
+                es.append(
+                    np.array(
+                        [
+                            # dimer, monomerA, monomerB
+                            data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
+                            data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
+                            data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
+                        ]
+                    )
+                )
+            if disp_correction:
+                es.append(
+                    data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["DLPNO-CCSD DISPERSION CORRECTION"],
+                )
+        except (Exception, SegFault) as e:
+            print("Exception:", e)
+            es.append(None)
+            es.append(None)
+            es.append(None)
+            if paren_t:
+                es.append(None)
+                es.append(None)
+            if disp_correction:
+                es.append(None)
+        handle_hrcl_psi4_cleanup(js, l)
+    return es
+
 
 def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -566,6 +659,7 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
     )
     es = []
     from psi4.driver.procrouting import proc_util
+
     mult = constants.conversion_factor("hartree", "kcal / mol")
     for l in js.extra_info["level_theory"]:
         mol = psi4.geometry(geom)
@@ -573,9 +667,9 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
         try:
             dft_functional = l.split("/")[0]
             dimer, monomerA, monomerB = proc_util.prepare_sapt_molecule(mol, "dimer")
-            dimer_d4, _ = dimer.run_dftd4(dft_functional, 'd4bjeeqatm')
-            monA_d4, _ = monomerA.run_dftd4(dft_functional, 'd4bjeeqatm')
-            monB_d4, _ = monomerB.run_dftd4(dft_functional, 'd4bjeeqatm')
+            dimer_d4, _ = dimer.run_dftd4(dft_functional, "d4bjeeqatm")
+            monA_d4, _ = monomerA.run_dftd4(dft_functional, "d4bjeeqatm")
+            monB_d4, _ = monomerB.run_dftd4(dft_functional, "d4bjeeqatm")
             d4_ie = (dimer_d4 - monA_d4 - monB_d4) * mult
             dimer_e = psi4.energy(f"{l}", molecule=dimer)
             monA_e = psi4.energy(f"{l}", molecule=monomerA)
@@ -590,6 +684,7 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
         handle_hrcl_psi4_cleanup(js, l)
     print(f"{es = }")
     return es
+
 
 def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -1040,9 +1135,17 @@ def run_psi4_dimer_energy(
         psi4.core.clean()
     return es
 
+
 def options_dict_to_psi4_options(options):
     replacements = ['"', "'"]
-    return str(options).replace("'", '').replace('"', '').replace(":", "=").replace(",", ",\n")
+    return (
+        str(options)
+        .replace("'", "")
+        .replace('"', "")
+        .replace(":", "=")
+        .replace(",", ",\n")
+    )
+
 
 def generate_energy_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
@@ -1073,7 +1176,8 @@ energy('{l}')
 """
         with open(f"{job_dir}/p4.in", "w") as f:
             f.write(input_information)
-    return 
+    return
+
 
 def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
     """
@@ -1101,6 +1205,7 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
         out_nbf_electrons = np.array([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
         output.append(out_nbf_electrons)
     return output
+
 
 def run_sapt0_components(js: jobspec.sapt0_js) -> np.array:
     """
@@ -1139,7 +1244,7 @@ energy('{l}')
         EXCH = psi4.core.variable("SAPT EXCH ENERGY")
         IND = psi4.core.variable("SAPT IND ENERGY")
         # NOTE: would need to get 'SAPT-D TOTAL ENERGY' if not doing sum here
-        if 'sapt0-d' in l.lower():
+        if "sapt0-d" in l.lower():
             DISP = psi4.core.variable("DISPERSION CORRECTION ENERGY")
         else:
             DISP = psi4.core.variable("SAPT DISP ENERGY")
@@ -1321,6 +1426,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False):
     generate_outputs = "out" in js.extra_info.keys()
     set_scratch = "scratch" in js.extra_info.keys()
     verbosity = js.extra_info.get("verbosity", None)
+    job_dir = None
     if set_scratch:
         psi4.core.IOManager.shared_object().set_default_path(
             os.path.abspath(os.path.expanduser(js.extra_info["scratch"]["path"]))
@@ -1334,7 +1440,7 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False):
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
         psi4.set_num_threads(js.extra_info["num_threads"])
-    return
+    return job_dir
 
 
 def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
@@ -1365,7 +1471,9 @@ def handle_hrcl_psi4_cleanup(js, l, sub_job=0, psi4_clean_all=True, wfn=None):
     return
 
 
-def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force_neutral_cation=True):
+def run_saptdft_grac_shift(
+    js: jobspec.saptdft_mon_grac_js, print_level=1, force_neutral_cation=True
+):
     """
     xtra = {"level_theory": ["pbe0/aug-cc-pVDZ"], "charge_index": 1, "options": options}
     """
@@ -1396,7 +1504,9 @@ def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js, print_level=1, force
         mol_cation = psi4.core.Molecule.from_schema(mol_qcel.dict())
     except Exception as e:
         print(e)
-        return [[None, None, None, None] for _ in range(len(js.extra_info["level_theory"]))]
+        return [
+            [None, None, None, None] for _ in range(len(js.extra_info["level_theory"]))
+        ]
 
     # geom_cation = f"{charges[0]+1} {charges[1]+1}\n{mn}"
     for l in js.extra_info["level_theory"]:
@@ -1727,7 +1837,9 @@ def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
     return es
 
 
-def create_psi4_input_file(js: jobspec.sapt0_js, helper_code=True, input_type='psiapi', id=None) -> np.array:
+def create_psi4_input_file(
+    js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None
+) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -1752,16 +1864,17 @@ def create_psi4_input_file(js: jobspec.sapt0_js, helper_code=True, input_type='p
             id = f"_{id}"
         else:
             id = ""
-        if input_type == 'psiapi':
+        if input_type == "psiapi":
             file_name += f"/psi4{id}.py"
-        elif input_type == 'psithon':
+        elif input_type == "psithon":
             file_name += f"/psi4{id}.in"
-        elif input_type == 'qcschema':
+        elif input_type == "qcschema":
             file_name += f"/psi4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
 
-        np_encoder = """
+        np_encoder = (
+            """
 import json
 import numpy as np
 
@@ -1770,16 +1883,24 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-        """ if helper_code else ""
-        save_results = """
+        """
+            if helper_code
+            else ""
+        )
+        save_results = (
+            """
 
 with open("vars.json", "w") as f:
      json_dump = json.dumps(psi4.core.variables(), indent=4, cls=NumpyEncoder)
      f.write(json_dump)
-        """ if helper_code else ""
-        if input_type == 'psiapi':
+        """
+            if helper_code
+            else ""
+        )
+        if input_type == "psiapi":
             import pprint
-            options = pprint.pformat(js.extra_info['options'])
+
+            options = pprint.pformat(js.extra_info["options"])
             geom = f'"""{geom}"""'
             input = f"""import psi4
 

@@ -86,8 +86,8 @@ class pgsql_operations:
             cur.execute(cmd)
         else:
             cur.execute(self.job_query_cmd, (id,))
-        # see if 'mem' is attribute of js_obj and extra_info has key 'mem_per_process'
-        if hasattr(js_obj, "mem") and "mem_per_process" in extra_info.keys():
+
+        if "mem" in js_obj.__annotations__ and "mem_per_process" in extra_info.keys():
             js_ls = [
                 js_obj(
                     *i,
@@ -136,11 +136,16 @@ class pgsql_operations:
             if len(output) < 1:
                 print("No output to update")
                 return 
+            if len(output) != len(self.update_cmd.split('%s')) - 2:
+                print(f"Output and update_cmd do not match: {len(output) = } {len(self.update_cmd.split('%s')) - 2 = }")
+                return
             cur = conn.cursor()
             cur.execute(self.update_cmd, (*output, id_value))
             conn.commit()
         except (Exception) as e:
+            import traceback
             print(f"Error updating {id_value}: {e}")
+            print(traceback.format_exc())
         return
     
     def connect_db(self):
