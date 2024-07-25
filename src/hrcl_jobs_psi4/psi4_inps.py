@@ -577,6 +577,9 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
     )
+    # DLPNO-CCSD has issues with non C1 symmetries so enforce C1
+    if "symmetry c1" not in geom:
+        geom += "\nsymmetry c1"
     es = []
     bsse_type = js.extra_info.get("bsse_type", "CP")
 
