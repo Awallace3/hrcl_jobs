@@ -17,8 +17,13 @@ def get_methods(in_method: str) -> str:
     """Return the full name of the method from the shortened name."""
     if in_method.lower() in simple_methods:
         return in_method.lower()
-    if in_method.lower() == "SAPT_DFT":
+    if in_method.lower() == "sapt_dft":
         method = "SAPT(DFT)"
+    elif in_method.lower() == "b97-0":
+        method = "B97-0"
+    elif in_method.lower() == "b2plyp":
+        method = "b2plyp"
+
     elif "MBIS" in in_method:
         method = in_method.split("_")[1]
     else:

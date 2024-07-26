@@ -656,6 +656,7 @@ def table_add_columns(
     schema_name: str,
     table_dict: dict,
     debug: bool = True,
+    print_only: bool = False,
 ) -> bool:
     """
     table_add_columns insert columns into a table.
@@ -677,8 +678,11 @@ def table_add_columns(
         pp(existing_table.keys())
     for k, v in table_dict.items():
         if k.replace('"', "") not in existing_table.keys():
-            if debug:
-                print(f"Adding column {k} to {schema_name}{table_name}")
+            # if debug:
+            if print_only:
+                print(f"ALTER TABLE {schema_name}{table_name} ADD COLUMN {k} {v};")
+                continue
+            print(f"Adding column {k} to {schema_name}{table_name}")
             cur.execute(f"ALTER TABLE {schema_name}{table_name} ADD COLUMN {k} {v};")
             con.commit()
     return True

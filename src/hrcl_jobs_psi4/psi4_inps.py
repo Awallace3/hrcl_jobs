@@ -588,7 +588,11 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
         paren_t = "(t)" in l.lower()
         disp_correction = "DISPERSION_CORRECTION" in js.extra_info["options"].keys()
         mol = psi4.geometry(geom)
-        job_dir = handle_hrcl_extra_info_options(js, l)
+        sub_dir = 0
+        pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
+        if pno_convergence.upper() != "NORMAL":
+            sub_dir = pno_convergence.upper()
+        job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         try:
         # should be using git@github.com:Awallace3/psi4.git -b dlpno_ccsd_t_upstream
             output_information = f"{os.getcwd()}/{job_dir}/many_body.out"
@@ -674,10 +678,12 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
             monA_d4, _ = monomerA.run_dftd4(dft_functional, "d4bjeeqatm")
             monB_d4, _ = monomerB.run_dftd4(dft_functional, "d4bjeeqatm")
             d4_ie = (dimer_d4 - monA_d4 - monB_d4) * mult
-            dimer_e = psi4.energy(f"{l}", molecule=dimer)
-            monA_e = psi4.energy(f"{l}", molecule=monomerA)
-            monB_e = psi4.energy(f"{l}", molecule=monomerB)
-            dft_ie = (dimer_e - monA_e - monB_e) * mult
+            # dimer_e = psi4.energy(f"{l}", molecule=dimer)
+            # monA_e = psi4.energy(f"{l}", molecule=monomerA)
+            # monB_e = psi4.energy(f"{l}", molecule=monomerB)
+            # UPDATED to match output of SAPT(DFT)'s DFT IE
+            dft_ie = psi4.energy(f"{l}", molecule=dimer, bsse_type="cp") * mult
+            # dft_ie = (dimer_e - monA_e - monB_e) * mult
             es.append(dft_ie)
             es.append(d4_ie)
         except (Exception, SegFault) as e:
