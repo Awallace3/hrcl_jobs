@@ -532,7 +532,8 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
         mol = psi4.geometry(geom)
         js.extra_info["options"]["sapt_dft_grac_shift_a"] = js.grac_shift_a
         js.extra_info["options"]["sapt_dft_grac_shift_b"] = js.grac_shift_b
-        handle_hrcl_extra_info_options(js, l)
+        sub_dir = js.extra_info["options"].get("SAPT_DFT_FUNCTIONAL", 0)
+        handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         do_ddft_d4 = js.extra_info["options"].get(
             "SAPT_DFT_DO_DDFT", False
         ) and js.extra_info["options"].get("SAPT_DFT_D4_IE", False)
@@ -645,8 +646,9 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                 es.append(
                     data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["DLPNO-CCSD DISPERSION CORRECTION"],
                 )
-        except (Exception, SegFault) as e:
-            print("Exception:", e)
+        # except (Exception, SegFault) as e:
+        except:
+            print("Exception!")
             es.append(None)
             es.append(None)
             es.append(None)
@@ -723,7 +725,7 @@ def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
     return
 
 
-def run_ccsd_t_CBS_IE(js: jobspec.saptdft_js) -> np.array:
+def run_method_IE(js: jobspec.sapt0_js) -> np.array:
     """
     Untested
     """
@@ -731,7 +733,7 @@ def run_ccsd_t_CBS_IE(js: jobspec.saptdft_js) -> np.array:
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
     )
-    cp = js.extra_info.get("CP", "NOCP")
+    cp = js.extra_info.get("CP", "CP")
     es = []
     for l in js.extra_info["level_theory"]:
         mol = psi4.geometry(geom)
@@ -739,19 +741,14 @@ def run_ccsd_t_CBS_IE(js: jobspec.saptdft_js) -> np.array:
         try:
             e = psi4.energy(f"{l}", bsse_type=cp)
             e *= constants.conversion_factor("hartree", "kcal / mol")
-            # ie = psi4.core.variable("SAPT(DFT) TOTAL ENERGY")
-            # ELST = psi4.core.variable("SAPT ELST ENERGY")
-            # EXCH = psi4.core.variable("SAPT EXCH ENERGY")
-            # IND = psi4.core.variable("SAPT IND ENERGY")
-            # DISP = psi4.core.variable("SAPT DISP ENERGY")
             mult = constants.conversion_factor("hartree", "kcal / mol")
-            out_energies = np.array([e]) * mult
+            out_energies = e 
         except Exception as e:
             print("Exception:", e)
             out_energies = None
         es.append(out_energies)
         handle_hrcl_psi4_cleanup(js, l)
-    return
+    return es
 
 
 def run_psi4_saptdft(
@@ -815,32 +812,8 @@ def run_saptdft(js: saptdft_js) -> np.array:
     shift_a = run_dft_neutral_cation(
         ma, charges=js.charges[1], ppm=js.mem, level_theory=js.level_theory
     )
-    # shift_b = run_dft_neutral_cation(
-    #     mb, charges=js.charges[2], ppm=js.mem, level_theory=js.level_theory
-    # )
-    # shift_a.extend(shift_b)
-    # ies = run_psi4_saptdft(
-    #     ma,
-    #     mb,
-    #     ppm=js.mem,
-    #     level_theory=js.level_theory,
-    #     sapt_dft_grac_shift_a=shift_a[-1],
-    #     sapt_dft_grac_shift_b=shift_b[-1],
-    # )
-    # shift_a.extend(ies)
     return shift_a
 
-
-# def run_saptdft_grac_shift(js: jobspec.saptdft_mon_grac_js):
-#     mn = []
-#     for i in js.monNs:
-#         mn.append(js.geometry[i, :])
-#     mn = tools.np_carts_to_string(mn)
-#     shift_n = run_dft_neutral_cation(mn,
-#                                      charges=js.charges[1],
-#                                      ppm=js.mem,
-#                                      level_theory=js.level_theory)
-#     return shift_n
 
 
 def run_saptdft(js: saptdft_js) -> np.array:
@@ -1521,40 +1494,40 @@ def run_saptdft_grac_shift(
     for l in js.extra_info["level_theory"]:
         # Neutral monomer energy
         sub_job = "neutral"
-        try:
-            handle_hrcl_extra_info_options(js, l, sub_job)
-            # psi4.geometry(geom_neutral)
-            E_neutral, wfn_n = psi4.energy(l, return_wfn=True, molecule=mol_neutral)
-            occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
-                dense=True
-            )
-            HOMO = np.amax(occ_neutral)
-            handle_hrcl_psi4_cleanup(js, l, sub_job)
+        # try:
+        handle_hrcl_extra_info_options(js, l, sub_job)
+        # psi4.geometry(geom_neutral)
+        E_neutral, wfn_n = psi4.energy(l, return_wfn=True, molecule=mol_neutral)
+        occ_neutral = wfn_n.epsilon_a_subset(basis="SO", subset="OCC").to_array(
+            dense=True
+        )
+        HOMO = np.amax(occ_neutral)
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
 
-            # Cation monomer energy
-            sub_job = "cation"
-            # Used to read in neutral density as guess for cation, investigate if breaks
-            # js.extra_info["options"]["scf__guess"] = "read"
-            handle_hrcl_extra_info_options(js, l, sub_job)
-            E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
-            grac = E_cation - E_neutral + HOMO
-            if grac >= 1 or grac <= -1:
-                print(f"{grac = }")
-                raise Exception("Grac appears wrong. Not inserting into DB.")
-            if print_level < 3:
-                print(f"{E_cation = } {E_neutral = } {HOMO = } {grac = }")
-            out.append(E_neutral)
-            out.append(E_cation)
-            out.append(HOMO)
-            out.append(grac)
-            handle_hrcl_psi4_cleanup(js, l, sub_job)
-        except (psi4.SCFConvergenceError, Exception) as e:
-            out.append(None)
-            out.append(None)
-            out.append(None)
-            out.append(None)
-            print(e)
-            handle_hrcl_psi4_cleanup(js, l, sub_job)
+        # Cation monomer energy
+        sub_job = "cation"
+        # Used to read in neutral density as guess for cation, investigate if breaks
+        # js.extra_info["options"]["scf__guess"] = "read"
+        handle_hrcl_extra_info_options(js, l, sub_job)
+        E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
+        grac = E_cation - E_neutral + HOMO
+        if grac >= 1 or grac <= -1:
+            print(f"{grac = }")
+            raise Exception("Grac appears wrong. Not inserting into DB.")
+        if print_level < 3:
+            print(f"{E_cation = } {E_neutral = } {HOMO = } {grac = }")
+        out.append(E_neutral)
+        out.append(E_cation)
+        out.append(HOMO)
+        out.append(grac)
+        handle_hrcl_psi4_cleanup(js, l, sub_job)
+        # except (psi4.SCFConvergenceError, Exception) as e:
+            # out.append(None)
+            # out.append(None)
+            # out.append(None)
+            # out.append(None)
+            # print(e)
+            # handle_hrcl_psi4_cleanup(js, l, sub_job)
     return out
 
 
@@ -1859,6 +1832,7 @@ def create_psi4_input_file(
     for l in js.extra_info["level_theory"]:
         # sub_job = js.extra_info["options"]["pno_convergence"]
         job_dir = generate_job_dir(js, l, 0)
+        print(f"{job_dir = }")
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
         first = True

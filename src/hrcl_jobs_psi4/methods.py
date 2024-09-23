@@ -19,11 +19,16 @@ def get_methods(in_method: str) -> str:
         return in_method.lower()
     if in_method.lower() == "sapt_dft":
         method = "SAPT(DFT)"
+    elif in_method.lower() == "wb97x":
+        method = "wb97x"
     elif in_method.lower() == "b97-0":
         method = "B97-0"
+    elif in_method.lower() == "b97-1":
+        method = "B97-1"
     elif in_method.lower() == "b2plyp":
         method = "b2plyp"
-
+    elif in_method.lower() == "b3lyp":
+        method = "b3lyp"
     elif "MBIS" in in_method:
         method = in_method.split("_")[1]
     else:
