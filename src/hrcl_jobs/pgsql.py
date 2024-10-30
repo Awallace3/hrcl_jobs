@@ -113,22 +113,6 @@ class pgsql_operations:
         return js_ls
 
     def update(self, conn, output, id_value):
-        # if len(output_columns) != len(output):
-        #     print("OUTPUT_COLUMNS AND OUTPUT MUST BE THE SAME LENGTH!", id_value)
-        #     return
-        # headers = ",\n".join([f"{i} = ?" for i in output_columns])
-        # cmd = f"""
-        #     UPDATE {table}
-        #     SET
-        #         {headers}
-        #     WHERE
-        #         {id_label}=?;
-        # """
-        # if not insert_none:
-        #     for i in output:
-        #         if i is None:
-        #             print(f"None in output, skipping {id_value}: {output = }...")
-        #             return
         try:
             for i in range(len(output)):
                 if isinstance(output[i], np.ndarray):

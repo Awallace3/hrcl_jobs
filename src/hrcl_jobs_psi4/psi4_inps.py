@@ -591,8 +591,12 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
         mol = psi4.geometry(geom)
         sub_dir = 0
         pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
+        weak_pair_algo = js.extra_info["options"].get("WEAK_PAIR_ALGORITHM", "")
+        sub_dir = ""
         if pno_convergence.upper() != "NORMAL":
-            sub_dir = pno_convergence.upper()
+            sub_dir += pno_convergence.upper() 
+        if weak_pair_algo != "":
+            sub_dir += weak_pair_algo.upper() 
         job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         try:
         # should be using git@github.com:Awallace3/psi4.git -b dlpno_ccsd_t_upstream
@@ -618,6 +622,16 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                         data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
                         data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
                         data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
+                    ]
+                )
+            )
+            es.append(
+                np.array(
+                    [
+                        # dimer, monomerA, monomerB
+                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
+                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
+                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
                     ]
                 )
             )
@@ -647,8 +661,10 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                     data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["DLPNO-CCSD DISPERSION CORRECTION"],
                 )
         # except (Exception, SegFault) as e:
-        except:
+        except (Exception) as e:
+            print("Exception:", e)
             print("Exception!")
+            es.append(None)
             es.append(None)
             es.append(None)
             es.append(None)
@@ -1469,8 +1485,10 @@ def run_saptdft_grac_shift(
         mn = tools.np_carts_to_string(mn)
         charges = js.charges[js.extra_info["charge_index"]]
         geom_neutral = f"{charges[0]} {charges[1]}\n{mn}"
+        print(f"{geom_neutral = }")
         mol = psi4.geometry(geom_neutral)
         mol_qcel_dict = mol.to_schema(dtype=2)
+        print(mol_qcel_dict)
         del mol_qcel_dict["fragment_charges"]
         del mol_qcel_dict["fragment_multiplicities"]
         del mol_qcel_dict["molecular_multiplicity"]
@@ -1510,7 +1528,15 @@ def run_saptdft_grac_shift(
         # js.extra_info["options"]["scf__guess"] = "read"
         handle_hrcl_extra_info_options(js, l, sub_job)
         E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
+        neut_geom = mol_neutral.to_arrays()[0]
+        cati_geom =  mol_cation.to_arrays()[0]
+        print(neut_geom)
+        print(cati_geom)
+
+
+        print(f"{E_neutral = }, {E_cation = }, {HOMO = }")
         grac = E_cation - E_neutral + HOMO
+        print(f"{grac = }")
         if grac >= 1 or grac <= -1:
             print(f"{grac = }")
             raise Exception("Grac appears wrong. Not inserting into DB.")
@@ -1768,6 +1794,27 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
             for i in range(7):
                 es.append(None)
     return es
+
+def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
+    generate_outputs = "out" in js.extra_info.keys()
+    es = []
+    monAs = [i for i in range(len(js.geometry))]
+    if len(js.charges) == 3:
+        js.charges = js.charges[0]
+    geom = tools.generate_p4input_from_df(
+        js.geometry, js.charges, monAs=monAs, monBs=None, units="angstrom"
+    )
+    output = []
+    psi4.core.be_quiet()
+    for l in js.extra_info["level_theory"]:
+        m, b = l.split("/")
+        handle_hrcl_extra_info_options(js, l)
+        mol = psi4.geometry(geom)
+        psi4.set_options({"basis": b})
+        wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
+        wert = wfn.basisset()
+        output.extend([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+    return output
 
 
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
