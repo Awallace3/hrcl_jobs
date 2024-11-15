@@ -1823,6 +1823,7 @@ def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
 
 
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
+    print("Processing")
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -1845,6 +1846,8 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
 def create_psi4_input_file(
     js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None
 ) -> np.array:
+    job_label = f"{js.id_label}"
+    print(f"Processing {job_label}")
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -1888,7 +1891,7 @@ def create_psi4_input_file(
             file_name += f"/p4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
-        js.extra_info['function_call'] = js.extra_info['function_call'].replace("<ID>", str(js.id_label))
+        function_call = js.extra_info['function_call'].replace("<ID>", job_label)
 
         np_encoder = (
             """
@@ -1928,7 +1931,7 @@ mol = psi4.geometry({geom})
 
 psi4.set_options({options})
 
-{js.extra_info['function_call']}
+{function_call}
 {save_results}"""
             with open(file_name, "w") as f:
                 f.write(input)
@@ -1944,7 +1947,7 @@ set {{
 {opts}
 }}
 
-{js.extra_info['function_call']}
+{function_call}
 {save_results}"""
             with open(f"{job_dir}/psi4.in", "w") as f:
                 f.write(input)
@@ -1953,8 +1956,9 @@ set {{
         else:
             raise ValueError(f"input_type {input_type} not recognized")
     if js.extra_info.get('sbatch_file', None):
+        sbatch_file = js.extra_info['sbatch_file'].replace("<ID>", job_label)
         with open(f"{job_dir}/sbatch.sh", "w") as f:
-            f.write(js.extra_info['sbatch_file'])
+            f.write(sbatch_file)
         def_dir = os.getcwd()
         os.chdir(job_dir)
         print(f"Running sbatch in {job_dir}")
