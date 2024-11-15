@@ -746,6 +746,7 @@ def run_method_IE(js: jobspec.sapt0_js) -> np.array:
     Untested
     """
     generate_outputs = "out" in js.extra_info.keys()
+    # check if js.monAs np.size is 1, and if not flatten
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
     )
@@ -759,8 +760,8 @@ def run_method_IE(js: jobspec.sapt0_js) -> np.array:
             e *= constants.conversion_factor("hartree", "kcal / mol")
             mult = constants.conversion_factor("hartree", "kcal / mol")
             out_energies = e 
-        except Exception as e:
-            print("Exception:", e)
+        except:
+            print("Exception! Returning None")
             out_energies = None
         es.append(out_energies)
         handle_hrcl_psi4_cleanup(js, l)
@@ -1811,9 +1812,13 @@ def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
         handle_hrcl_extra_info_options(js, l)
         mol = psi4.geometry(geom)
         psi4.set_options({"basis": b})
-        wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
-        wert = wfn.basisset()
-        output.extend([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+        try:
+            wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
+            wert = wfn.basisset()
+            output.extend([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+        except Exception as e:
+            print("Exception:", e)
+            output.extend([None, None])
     return output
 
 
@@ -1837,35 +1842,6 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
     return ie
 
 
-def run_interaction_energy_cp(js: jobspec.sapt0_js) -> np.array:
-    """ """
-
-    for l in level_theory:
-        mol = psi4.geometry(geom)
-        psi4.set_memory(ppm)
-        psi4.set_options(
-            {
-                "d_convergence": d_convergence,
-                "freeze_core": "True",
-                "guess": "sad",
-                "scf_type": scf_type,
-                # "cholesky_tolerance": 1e-6 # default about 1e-4
-                # check psi4/src/read_options
-            }
-        )
-        # psi4.core.be_quiet()
-        if cp:
-            e = psi4.energy(l)
-            ie = psi4.core.variable("CP-CORRECTED INTERACTION ENERGY")
-        else:
-            e = psi4.energy(l, bsse_type="nocp")
-            ie = psi4.core.variable("NOCP-CORRECTED INTERACTION ENERGY")
-        ie *= constants.conversion_factor("hartree", "kcal / mol")
-        es.append(ie)
-        psi4.core.clean()
-    return es
-
-
 def create_psi4_input_file(
     js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None
 ) -> np.array:
@@ -1878,8 +1854,18 @@ def create_psi4_input_file(
         print("No output file specified. Not generating input files.")
     for l in js.extra_info["level_theory"]:
         # sub_job = js.extra_info["options"]["pno_convergence"]
-        job_dir = generate_job_dir(js, l, 0)
-        print(f"{job_dir = }")
+        paren_t = "(t)" in l.lower()
+        disp_correction = "DISPERSION_CORRECTION" in js.extra_info["options"].keys()
+        mol = psi4.geometry(geom)
+        sub_dir = 0
+        pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
+        weak_pair_algo = js.extra_info["options"].get("WEAK_PAIR_ALGORITHM", "")
+        sub_dir = ""
+        if pno_convergence.upper() != "NORMAL":
+            sub_dir += pno_convergence.upper()
+        if weak_pair_algo != "":
+            sub_dir += weak_pair_algo.upper()
+        job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
         first = True
@@ -1895,13 +1881,14 @@ def create_psi4_input_file(
         else:
             id = ""
         if input_type == "psiapi":
-            file_name += f"/psi4{id}.py"
+            file_name += f"/p4{id}.py"
         elif input_type == "psithon":
-            file_name += f"/psi4{id}.in"
+            file_name += f"/p4{id}.in"
         elif input_type == "qcschema":
-            file_name += f"/psi4{id}.json"
+            file_name += f"/p4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
+        js.extra_info['function_call'] = js.extra_info['function_call'].replace("<ID>", str(js.id_label))
 
         np_encoder = (
             """
@@ -1965,4 +1952,12 @@ set {{
             raise NotImplementedError()
         else:
             raise ValueError(f"input_type {input_type} not recognized")
+    if js.extra_info.get('sbatch_file', None):
+        with open(f"{job_dir}/sbatch.sh", "w") as f:
+            f.write(js.extra_info['sbatch_file'])
+        def_dir = os.getcwd()
+        os.chdir(job_dir)
+        print(f"Running sbatch in {job_dir}")
+        os.system(f"sbatch sbatch.sh")
+        os.chdir(def_dir)
     return [None for i in range(len(js.extra_info["level_theory"]))]

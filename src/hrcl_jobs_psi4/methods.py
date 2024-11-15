@@ -29,8 +29,23 @@ def get_methods(in_method: str) -> str:
         method = "b2plyp"
     elif in_method.lower() == "b3lyp":
         method = "b3lyp"
+    elif in_method.lower() == "b3lyp-d3bj":
+        method = "b3lyp-d3bj"
+    elif in_method.lower() == "pbe-d3bj":
+        method = "pbe-d3bj"
+    elif in_method.lower() == "pbeh3c":
+        method = "pbeh3c"
     elif "MBIS" in in_method:
         method = in_method.split("_")[1]
+    elif "MP2" in in_method.upper():
+        method = 'MP2'
+    elif in_method.lower() == "ccsd(t)":
+        method = "ccsd"
+    elif in_method.lower() == "ccsd_t_ie":
+        method = "ccsd(t)"
+    elif in_method.lower() == "ccsd(t)cbs":
+        # untested, will need to be with aDZ basis set
+        method = "mp2/aug-cc-pV[TQ]Z + d:ccsd(t)"
     else:
         print(f"Method Shortened: {in_method}")
         raise ValueError("in_method not recognized by hrcl_jobs_psi4.methos.py")

@@ -117,9 +117,12 @@ class pgsql_operations:
             for i in range(len(output)):
                 if isinstance(output[i], np.ndarray):
                     output[i] = output[i].tolist()
+            # check if every entry is not None
+            if not all(output):
+                print(f"None in output, skipping {id_value}: {output = }...")
             if len(output) < 1:
                 print("No output to update")
-                return 
+                return
             if len(output) != len(self.update_cmd.split('%s')) - 2:
                 print(f"Output and update_cmd do not match: {len(output) = } {len(self.update_cmd.split('%s')) - 2 = }")
                 return
@@ -415,6 +418,8 @@ def identify_array_dtype(array):
     """
     if issubclass(array.dtype.type, np.integer):
         return 'INTEGER'
+    elif array.dtype == '<U12':
+        return 'INTEGER'
     elif issubclass(array.dtype.type, np.float_):
         return 'DOUBLE PRECISION'
     else:
@@ -473,11 +478,13 @@ def format_value_for_sql(value):
     Format individual value for SQL insertion.
     """
     if isinstance(value, bytes):
-        print(value)
         value = convert_array(value)
     if isinstance(value, np.ndarray):
         # Convert ndarray to PostgreSQL array literal; nump.ndarray already prints in correct nested format if more dimensional.
-        return f'{{ {str(value.tolist())[1:-1]} }}'
+        return f"'{{ {str(value.tolist())[1:-1]} }}'"
+    elif isinstance(value, list):
+        # Convert ndarray to PostgreSQL array literal; nump.ndarray already prints in correct nested format if more dimensional.
+        return f"'{{ {str(value)[1:-1]} }}'"
     elif pd.isna(value):
         return 'NULL'
     elif isinstance(value, str):
@@ -490,29 +497,39 @@ def format_value_for_sql(value):
         return str(value).upper()
     elif isinstance(value, pd.Timestamp):
         return f"'{value}'"
+    elif isinstance(value, range):
+        return f"'{{ {str([i for i in value])[1:-1]} }}'"
     else:
         raise ValueError(f"Unsupported value type: {type(value)}")
 
-def write_sql_file(df, table_name='my_table', file_name='output.sql'):
+def write_sql_file(df, table_name='my_table', file_name='output.sql', schema=None, serial_key_id=True):
     col_types = get_postgresql_column_types(df)
     final_col_types = {}
     for col, v in col_types.items():
-        if " " in col:
+        if " " in col or "/" in col or not col.islower() or "(" in col or ")" in col or '[' in col or ']' in col:
             col = f'"{col}"'
         final_col_types[col] = v
+    schema_statement = ""
+    if schema is not None:
+        table_name = f'{schema}.{table_name}'
+        schema_statement = f"CREATE SCHEMA IF NOT EXISTS {schema};\n\n"
 
     columns_definition = ",\n  ".join([f'{col} {dtype}' for col, dtype in final_col_types.items()])
+    if serial_key_id:
+        columns_definition = f'id SERIAL PRIMARY KEY,\n  ' + columns_definition
     
     create_table_stmt = f'CREATE TABLE {table_name} (\n  {columns_definition}\n);'
     
     insert_into_stmts = []
     for i, row in df.iterrows():
-        values = ", ".join([format_value_for_sql(value) for value in row])
+        values = ", ".join([format_value_for_sql(value) for value in row]).replace("[", "{").replace("]", "}")
+        if serial_key_id:
+            values = f"DEFAULT, {values}"
         insert_into_stmt = f'INSERT INTO {table_name} VALUES ({values});'
         insert_into_stmts.append(insert_into_stmt)
     
     sql_statements = f'{create_table_stmt}\n\n' + "\n".join(insert_into_stmts)
-    
+    sql_statements = schema_statement + sql_statements
     with open(file_name, 'w') as file:
         file.write(sql_statements)
 
@@ -529,8 +546,9 @@ def convert_to_sql(df, table_name, file_name=None, debug=False, schema=None):
         # if " " in col:
         col = f'"{col}"'
         column_definitions.append(f"{col} {dtype}")
-    print("CREATE TABLE statement:")
-    print(",\n".join(column_definitions))
+    if debug:
+        print("CREATE TABLE statement:")
+        print(",\n".join(column_definitions))
 
     create_table_statement += ",\n".join(column_definitions)
     create_table_statement += "\n);"
@@ -547,6 +565,8 @@ def convert_to_sql(df, table_name, file_name=None, debug=False, schema=None):
                 # value = str(value).replace('[', '{').replace(']', '}') # Convert list to PostgreSQL array format
                 value = f"'{{ {str(value.tolist())[1:-1].replace('[', '{').replace(']', '}')} }}'"
                 values.append(value)
+            elif pd.isna(value):
+                values.append('NULL')
             elif isinstance(value, str):
                 values.append("'" + value.replace("'", "''") + "'") # Escape single quotes in strings
             elif isinstance(value, bool):
@@ -566,6 +586,16 @@ def convert_to_sql(df, table_name, file_name=None, debug=False, schema=None):
         with open(file_name, 'w') as f:
             f.write(sql_schema)
     return sql_schema
+
+
+def convert_sql_array_to_numpy(array):
+    """
+    Convert a PostgreSQL array string to a numpy array.
+    """
+    array = array.replace("{", "[").replace("}", "]")
+    return np.array(eval(array))
+
+
 
 def generate_sql_file_info(df, table_name, foreign_keys=None, file_name=None, debug=False, schema=None):
     table_name_start = table_name
@@ -667,7 +697,7 @@ def table_add_columns(
                 print(f"ALTER TABLE {schema_name}{table_name} ADD COLUMN {k} {v};")
                 continue
             print(f"Adding column {k} to {schema_name}{table_name}")
+            cur = con.cursor()
             cur.execute(f"ALTER TABLE {schema_name}{table_name} ADD COLUMN {k} {v};")
             con.commit()
     return True
-
