@@ -1,16 +1,9 @@
 from . import sqlt
 from .sqlt import (
     establish_connection,
-    update_mp_rows,
-    update_rows,
-    collect_rows_into_js_ls_mp,
-    collect_row_specific_into_js_mp,
-    read_example_output,
     collect_id_into_js,
     update_by_id,
 )
-import os
-from glob import glob
 import time
 from .jobspec import example_js
 from . import pgsql
@@ -24,6 +17,7 @@ def example_run_js_job(js: example_js) -> float:
     v2 = js.val + 2
     return [v1, v2]
 
+
 def truncated_output(lst, max_length_str=30):
     trunc_lst = []
     for i in lst:
@@ -32,6 +26,7 @@ def truncated_output(lst, max_length_str=30):
         else:
             trunc_lst.append(i)
     return trunc_lst
+
 
 def ms_sl_extra_info_pg(
     pgsql_op: pgsql.pgsql_operations,
@@ -45,7 +40,7 @@ def ms_sl_extra_info_pg(
     first = True
     conn, cur = pgsql_op.connect_db()
     for n, active_ind in enumerate(id_list):
-        print(f"{active_ind=}")
+        print(f"{active_ind=}, {n+1}/{len(id_list)}")
         js = pgsql_op.job_query(conn, active_ind, js_obj, extra_info)
         output = run_js_job(js)
         insertion_str = ""
@@ -57,7 +52,6 @@ def ms_sl_extra_info_pg(
     print((time.time() - start) / 60, "Minutes")
     print("COMPLETED MAIN")
     return
-
 
 
 def ms_sl_extra_info(
@@ -89,7 +83,6 @@ def ms_sl_extra_info(
     """
 
     start = time.time()
-    first = True
     con, cur = establish_connection(db_p=db_path)
     for n, active_ind in enumerate(id_list):
         js = collect_id_into_js(

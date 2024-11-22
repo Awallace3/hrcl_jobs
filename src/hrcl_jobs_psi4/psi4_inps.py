@@ -13,6 +13,7 @@ from qm_tools_aw import tools
 import qcelemental as qcel
 from pprint import pprint as pp
 from . import methods
+import subprocess
 
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
@@ -1957,6 +1958,13 @@ set {{
             raise ValueError(f"input_type {input_type} not recognized")
     if js.extra_info.get('sbatch_file', None):
         sbatch_file = js.extra_info['sbatch_file'].replace("<ID>", job_label)
+        # check sbatch file for #SBATCH -J* and compare with squeue -u $USER
+        # jobs to ensure that job isn't already in the queue
+        job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
+        check_ouptut = subprocess.check_output("""squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""", shell=True).decode()
+        if job_name in check_ouptut:
+            print(f"Job {job_name} already in the queue. Not submitting.")
+            return [None for i in range(len(js.extra_info["level_theory"]))]
         with open(f"{job_dir}/sbatch.sh", "w") as f:
             f.write(sbatch_file)
         def_dir = os.getcwd()
