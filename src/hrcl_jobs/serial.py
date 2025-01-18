@@ -37,7 +37,6 @@ def ms_sl_extra_info_pg(
     print_insertion=False,
 ):
     start = time.time()
-    first = True
     conn, cur = pgsql_op.connect_db()
     for n, active_ind in enumerate(id_list):
         print(f"{active_ind=}, {n+1}/{len(id_list)}")
@@ -85,6 +84,7 @@ def ms_sl_extra_info(
     start = time.time()
     con, cur = establish_connection(db_p=db_path)
     for n, active_ind in enumerate(id_list):
+        print(f"{active_ind=}, {n+1}/{len(id_list)}")
         js = collect_id_into_js(
             cur,
             mem=ppm,
@@ -145,7 +145,6 @@ def ms_sl_serial(
     """
 
     start = time.time()
-    first = True
     con, cur = establish_connection(db_p=db_path)
     for n, active_ind in enumerate(id_list):
         js = collect_id_into_js(
