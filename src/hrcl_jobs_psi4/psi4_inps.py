@@ -1,10 +1,7 @@
 import os
-import pandas as pd
 import numpy as np
-from dataclasses import dataclass
 from .jobspec import mp_js, grimme_js, saptdft_js, mp_mon_js
 from . import jobspec
-from periodictable import elements
 import psi4
 from psi4 import oeprop
 from qcelemental import constants
@@ -14,6 +11,8 @@ import qcelemental as qcel
 from pprint import pprint as pp
 from . import methods
 import subprocess
+
+
 
 """
 /theoryfs2/ds/amwalla3/miniconda3/envs/psi4mpi4py_qcng/lib/python3.8/site-packages/psi4/driver/driver_nbody.py
@@ -42,15 +41,6 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
-
-def create_pt_dict():
-    """
-    create_pt_dict creates dictionary for string elements to atomic number.
-    """
-    el_dc = {}
-    for el in elements:
-        el_dc[el.number] = el.symbol
-    return el_dc
 
 
 def psi4_vac_mp(
@@ -181,7 +171,7 @@ def prep_mol(R, Z, TQ, E, ending_tags=True):
     return mol
 
 
-def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=create_pt_dict()):
+def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=tools.create_pt_dict()):
     """
     returns [
         vac_multipole_AB,
@@ -201,7 +191,7 @@ def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=create_pt_dict()):
     return output
 
 
-def run_mp_js_job_only_dimer(js: mp_js, el_dc=create_pt_dict()):
+def run_mp_js_job_only_dimer(js: mp_js, el_dc=tools.create_pt_dict()):
     """
     returns [
         vac_multipole_AB,
@@ -226,7 +216,7 @@ def run_mp_js_job_only_dimer(js: mp_js, el_dc=create_pt_dict()):
     return output
 
 
-def run_mp_mon_js(js: mp_mon_js, el_dc=create_pt_dict()):
+def run_mp_mon_js(js: mp_mon_js, el_dc=tools.create_pt_dict()):
     level_theory = js.level_theory[0]
     E = np.array([el_dc[i] for i in js.Z])
     mol_A = prep_mol(js.R, js.Z, js.TQ, E)
@@ -239,7 +229,7 @@ def run_mp_mon_js(js: mp_mon_js, el_dc=create_pt_dict()):
     return output
 
 
-def run_mp_js_job_vac_only(js: mp_js, el_dc=create_pt_dict()) -> np.array:
+def run_mp_js_job_vac_only(js: mp_js, el_dc=tools.create_pt_dict()) -> np.array:
     """
     create_mp_js_job turns mp_js object into a psi4 job and runs it
     """
@@ -279,7 +269,7 @@ def run_mp_js_job_vac_only(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     return output
 
 
-def run_mp_js_job(js: mp_js, el_dc=create_pt_dict()) -> np.array:
+def run_mp_js_job(js: mp_js, el_dc=tools.create_pt_dict()) -> np.array:
     """
     create_mp_js_job turns mp_js object into a psi4 job and runs it
     """
@@ -338,7 +328,7 @@ def run_mp_js_job(js: mp_js, el_dc=create_pt_dict()) -> np.array:
     return output
 
 
-def run_mp_js_job_test(js: mp_js, el_dc=create_pt_dict()) -> np.array:
+def run_mp_js_job_test(js: mp_js, el_dc=tools.create_pt_dict()) -> np.array:
     """
     create_mp_js_job turns mp_js object into a psi4 job and runs it
     """
@@ -1081,7 +1071,7 @@ def run_mp_js_dimer_energy(js: mp_js) -> []:
     """
     run_bsse_js runs js for bsse energies
     """
-    el_dc = create_pt_dict()
+    el_dc = tools.create_pt_dict()
     EA = np.array([el_dc[i] for i in js.ZA])
     EB = np.array([el_dc[i] for i in js.ZB])
     mol_A = prep_mol(js.RA, js.ZA, js.TQA, EA, ending_tags=False)

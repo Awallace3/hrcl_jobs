@@ -26,7 +26,7 @@ def example_run_js_job(js: example_js) -> float:
     return [v1, v2]
 
 
-class machineResources:
+class machine:
     def __init__(
         self,
         name: str,
@@ -34,7 +34,7 @@ class machineResources:
         threads: int,
         memory: int,
         memory_per_core="4 gb",
-        omp_threads: int = 2,
+        omp_threads: int = 6,
     ):  # GB
         self.name = name
         self.cores = cores
@@ -42,6 +42,22 @@ class machineResources:
         self.memory = memory  # Total Memory
         self.memory_per_thread = memory_per_core
         self.omp_threads = omp_threads
+
+    def __dict__(self):
+        return {
+            "name": self.name,
+            "cores": self.cores,
+            "threads": self.threads,
+            "memory": self.memory,
+            "memory_per_thread": self.memory_per_thread,
+            "omp_threads": self.omp_threads,
+        }
+
+    def __str__(self):
+        return str(self.__dict__())
+
+    def __repr__(self):
+        return str(self.__dict__())
 
 
 def truncated_output(lst, max_length_str=30):

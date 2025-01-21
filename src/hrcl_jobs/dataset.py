@@ -1,47 +1,59 @@
-import json
 import subprocess
-import time
-import os
 from . import sqlt
 from . import parallel
+from . import serial
 import hrcl_jobs_psi4 as hrcl_psi4
 import numpy as np
-import pandas as pd
-from qm_tools_aw import tools
-from pprint import pprint as pp
 from mpi4py import MPI
-from glob import glob
+from pprint import pprint as pp
 
 HIVE_PARAMS = {
     "mem_per_process": "60 gb",
     "num_omp_threads": 8,
 }
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+PARALLEL = True if size > 1 else False
+if not PARALLEL:
+    mode = serial
+    print("Running in serial mode")
+else:
+    mode = parallel
+    print("Running in parallel mode")
 
-def machine_list_resources(rank_0_one_thread=True) -> []:
-    from mpi4py import MPI
 
+def machine_dict_resources(
+    machine_dict: dict[str, parallel.machine],
+    rank_0_one_thread=True,
+) -> []:
+    """
+    machine_dict: dict[str, parallel.machineResources]
+        A dictionary containing machine names as keys and
+        their corresponding resources as values. Example:
+        machine_dict = {
+            "ds1": parallel.machineResources("ds1", 6, 6, 58),
+            "ds10": parallel.machineResources("ds1", 6, 6, 58),
+            "ds2": parallel.machineResources("ds2", 10, 20, 125),
+            "hex6": parallel.machineResources("hex6", 6, 6, 62),
+            "hex8": parallel.machineResources("hex8", 6, 6, 62),
+            "hex9": parallel.machineResources("hex9", 6, 6, 58),
+            "hex11": parallel.machineResources("hex11", 6, 6, 62),
+            "hornet": parallel.machineResources("hornet", 24, 24, 160),
+        }
+    """
+    # pp(machine_dict)
+    pp(machine_dict)
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    machines = {
-        "ds2": parallel.machineResources("ds2", 9, 9, 80),
-        "hex6": parallel.machineResources("hex6", 6, 6, 62),
-        "hex8": parallel.machineResources("hex8", 6, 6, 62),
-        "hex9": parallel.machineResources("hex9", 6, 6, 58),
-        "hex11": parallel.machineResources("hex11", 6, 6, 62),
-    }
     uname_n = subprocess.check_output("uname -n", shell=True).decode("utf-8").strip()
-
-    machine = machines[uname_n]
-
-    name = machine.name
-    cores = machine.cores
+    machine = machine_dict[uname_n]
     threads = machine.threads
     memory = machine.memory
 
     unames = comm.allgather(uname_n)
     current_machine_cnt = 0
-    start_rank = 0
     start = True
     for n, i in enumerate(unames):
         if start and i == uname_n:
@@ -50,8 +62,7 @@ def machine_list_resources(rank_0_one_thread=True) -> []:
             continue
         elif i == uname_n:
             current_machine_cnt += 1
-            start == True
-            start_rank = n
+            start = True
 
     if current_machine_cnt == 0:
         raise ValueError("No machines found")
@@ -62,19 +73,18 @@ def machine_list_resources(rank_0_one_thread=True) -> []:
 
     if rank_0_one_thread and on_rank_0:
         threads -= 1
-        current_machine_cnt -= 1
+        # current_machine_cnt -= 1
         memory -= 4
 
+    print(threads, current_machine_cnt)
     evenly_divided_omp = threads // current_machine_cnt
     remainder_omp = threads % current_machine_cnt
     if end_rank - rank < remainder_omp:
         omp_threads = evenly_divided_omp + 1
-        marked_for_more_mem = True
     else:
         omp_threads = evenly_divided_omp
-        marked_for_more_mem = False
 
-    if rank == 0:
+    if rank == 0 and PARALLEL:
         machine.omp_threads = 1
         machine.memory_per_thread = 4
     else:
@@ -104,12 +114,15 @@ def compute_MBIS(
     DB_NAME,
     TABLE_NAME,
     col_check="MBIS_hf_adz",
-    hex=True,
+    machine_dict=None,
     hive_params=HIVE_PARAMS,
     TESTING=False,
 ) -> None:
-    if hex:
-        machine = machine_list_resources()
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if machine_dict:
+        machine = machine_dict_resources(machine_dict=machine_dict)
         memory_per_thread = f"{machine.memory_per_thread} gb"
         num_omp_threads = machine.omp_threads
     else:
@@ -140,21 +153,10 @@ def compute_MBIS(
         f"MBIS_{method}_populations_a_{basis}": "array",
         f"MBIS_{method}_populations_b_{basis}": "array",
     }
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
     col_check_MBIS = f"MBIS_{method}_widths_a_{basis}"
-    if hex:
-        machine = machine_list_resources()
-        memory_per_thread = f"{machine.memory_per_thread} gb"
-        num_omp_threads = machine.omp_threads
-    else:
-        memory_per_thread = hive_params["mem_per_process"]
-        num_omp_threads = hive_params["num_omp_threads"]
 
     con, cur = sqlt.establish_connection(DB_NAME)
     mbis_ids = sqlt.collect_ids_for_parallel(
@@ -203,12 +205,12 @@ def compute_MBIS_atom(
     DB_NAME,
     TABLE_NAME,
     col_check="MBIS_hf_adz",
-    hex=True,
+    machine_dict=True,
     hive_params=HIVE_PARAMS,
     TESTING=False,
 ) -> None:
-    if hex:
-        machine = machine_list_resources()
+    if machine_dict:
+        machine = machine_dict_resources(machine_dict=machine_dict)
         memory_per_thread = f"{machine.memory_per_thread} gb"
         num_omp_threads = machine.omp_threads
     else:
@@ -226,15 +228,13 @@ def compute_MBIS_atom(
         f"MBIS_{method}_populations_{basis}": "array",
     }
     col_check_MBIS = f"MBIS_{method}_radial_2_{basis}"
-    from mpi4py import MPI
-
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-    if hex:
-        machine = machine_list_resources()
+    if machine_dict:
+        machine = machine_dict_resources(machine_dict=machine_dict)
         memory_per_thread = f"{machine.memory_per_thread} gb"
         num_omp_threads = machine.omp_threads
     else:
@@ -288,15 +288,15 @@ def compute_energy(
     DB_NAME,
     TABLE_NAME,
     col_check="SAPT0_adz",
-    hex=True,
+    machine_dict=True,
     hive_params=HIVE_PARAMS,
     TESTING=False,
     options=None,
     xtra=None,
     output_root="schr",
 ) -> None:
-    if hex:
-        machine = machine_list_resources()
+    if machine_dict:
+        machine = machine_dict_resources(machine_dict=machine_dict)
         memory_per_thread = f"{machine.memory_per_thread} gb"
         num_omp_threads = machine.omp_threads
     else:
@@ -309,17 +309,10 @@ def compute_energy(
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    num_procs = comm.Get_size()
     print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
-    if hex:
-        machine = machine_list_resources()
-        memory_per_thread = f"{machine.memory_per_thread} gb"
-        num_omp_threads = machine.omp_threads
-    else:
-        memory_per_thread = hive_params["mem_per_process"]
-        num_omp_threads = hive_params["num_omp_threads"]
-
     con, cur = sqlt.establish_connection(DB_NAME)
     job_ids = sqlt.collect_ids_for_parallel(
         DB_NAME,
@@ -340,7 +333,7 @@ def compute_energy(
         }
     print(f"{options = }")
     if xtra is None:
-        xtra= {
+        xtra = {
             "options": options,
             "num_threads": num_omp_threads,
             "level_theory": [f"{method}/{basis_str}"],
@@ -350,7 +343,7 @@ def compute_energy(
             },
         }
     print(f"{xtra = }")
-    parallel.ms_sl_extra_info(
+    mode.ms_sl_extra_info(
         id_list=job_ids,
         db_path=DB_NAME,
         table_name=TABLE_NAME,
