@@ -910,7 +910,7 @@ def table_to_df_pkl(
     print(df)
     df.to_pickle(df_p)
     print(df.columns)
-    return
+    return df
 
 
 def table_to_df_csv(

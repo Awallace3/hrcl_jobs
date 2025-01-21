@@ -1845,7 +1845,8 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
 
 
 def create_psi4_input_file(
-    js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None
+    js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None,
+    execute_input=False
 ) -> np.array:
     job_label = f"{js.id_label}"
     print(f"Processing {job_label}")
@@ -1971,5 +1972,18 @@ set {{
         os.chdir(job_dir)
         print(f"Running sbatch in {job_dir}")
         os.system(f"sbatch sbatch.sh")
+        os.chdir(def_dir)
+    if execute_input:
+        def_dir = os.getcwd()
+        os.chdir(job_dir)
+        print(f"Running job in {job_dir}")
+        if input_type == "psiapi":
+            exec(open(f"p4{id}.py").read())
+        elif input_type == "psithon":
+            os.system("psi4 p4.in")
+        elif input_type == "qcschema":
+            raise NotImplementedError()
+        else:
+            raise ValueError(f"input_type {input_type} not recognized")
         os.chdir(def_dir)
     return [None for i in range(len(js.extra_info["level_theory"]))]
