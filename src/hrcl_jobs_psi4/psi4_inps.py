@@ -1147,6 +1147,7 @@ def generate_energy_psi4_input_file(js: jobspec.sapt0_js, sub_job=0) -> np.array
         units="angstrom",
         extra=extra_geom_info,
     )
+    fps = []
     for lt in js.extra_info["level_theory"]:
         job_dir = generate_job_dir(js, lt, sub_job=sub_job)
         os.makedirs(job_dir, exist_ok=True)
@@ -1163,9 +1164,12 @@ molecule mol {{\n{geom}\n}}
 
 energy('{lt}'{bsse_str})
 """
-        with open(f"{job_dir}/p4.in", "w") as f:
+        filepath = f"{job_dir}/p4.in"
+        print(f"Writing to\n{filepath}")
+        with open(filepath, "w") as f:
             f.write(input_information)
-    return
+        fps.append(filepath)
+    return fps
 
 
 def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
@@ -1984,6 +1988,7 @@ set {{
 def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
     output = compute_nbf_ne(js)
     js.id_label = f"nbf_{output[0][0]}_ne_{output[0][1]}_id_{js.id_label}"
+    job_dirs = []
     for i in level_of_theories:
         method_basisset_mode = i.split("/")
         if len(method_basisset_mode) == 3:
@@ -1991,9 +1996,12 @@ def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
             js.extra_info["bsse_type"] = mode
             i = f"{method}/{basis}"
         js.extra_info["level_theory"] = [i]
-        job_dir = generate_job_dir(js, i, sub_job=sub_job)
+        job_dir = generate_job_dir(js, i, sub_job=mode)
         print(job_dir + "/p4.in")
-        generate_energy_psi4_input_file(js, sub_job=sub_job)
+        fps = generate_energy_psi4_input_file(js, sub_job=mode)
+        job_dir = fps[0]
         if len(method_basisset_mode) == 3:
             js.extra_info.pop("bsse_type")
-    return
+        mode = 0
+        job_dirs.append(job_dir)
+    return job_dirs
