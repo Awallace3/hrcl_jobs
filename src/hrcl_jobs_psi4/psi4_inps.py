@@ -11,6 +11,7 @@ import qcelemental as qcel
 from pprint import pprint as pp
 from . import methods
 import subprocess
+import math
 
 
 
@@ -1176,7 +1177,6 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
     """
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it
     """
-    generate_outputs = "out" in js.extra_info.keys()
     extra_geom_info = js.extra_info.get("geometry_options", None)
     geom = tools.generate_p4input_from_df(
         js.geometry,
@@ -1187,18 +1187,28 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
         extra=extra_geom_info,
     )
     output = []
-    verbosity = js.extra_info.get("verbosity", None)
-    for l in js.extra_info["level_theory"]:
-        m, b = l.split("/")
+    # generate_outputs = "out" in js.extra_info.keys()
+    for lt in js.extra_info["level_theory"]:
+        m, b = lt.split("/")
         # generate_outputs = js.extra_info.pop("out", None)
-        handle_hrcl_extra_info_options(js, l)
+        handle_hrcl_extra_info_options(js, lt)
         # if generate_outputs:
         #     js.extra_info['out'] = generate_outputs
         mol = psi4.geometry(geom)
         psi4.set_options({"basis": b})
         wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
         wert = wfn.basisset()
-        out_nbf_electrons = np.array([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+        wfn.n
+        print(dir(wert))
+        # check roundup or down
+        n_occupied = math.ceil((wfn.nalpha() + wfn.nbeta()) / 2)
+        n_virtual = wert.nbf() - n_occupied
+        out_nbf_electrons = np.array([
+            wert.nbf(),
+            wfn.nalpha() + wfn.nbeta(),
+            n_occupied,
+            n_virtual,
+        ])
         output.append(out_nbf_electrons)
     return output
 
