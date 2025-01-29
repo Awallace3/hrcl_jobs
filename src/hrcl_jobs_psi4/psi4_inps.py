@@ -1198,9 +1198,6 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
         psi4.set_options({"basis": b})
         wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
         wert = wfn.basisset()
-        wfn.n
-        print(dir(wert))
-        # check roundup or down
         n_occupied = math.ceil((wfn.nalpha() + wfn.nbeta()) / 2)
         n_virtual = wert.nbf() - n_occupied
         out_nbf_electrons = np.array([
@@ -1996,8 +1993,6 @@ set {{
 
 
 def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
-    output = compute_nbf_ne(js)
-    js.id_label = f"nbf_{output[0][0]}_ne_{output[0][1]}_id_{js.id_label}"
     job_dirs = []
     for i in level_of_theories:
         method_basisset_mode = i.split("/")
@@ -2006,6 +2001,8 @@ def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
             js.extra_info["bsse_type"] = mode
             i = f"{method}/{basis}"
         js.extra_info["level_theory"] = [i]
+        output = compute_nbf_ne(js)
+        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{js.id_label}"
         job_dir = generate_job_dir(js, i, sub_job=mode)
         print(job_dir + "/p4.in")
         fps = generate_energy_psi4_input_file(js, sub_job=mode)
