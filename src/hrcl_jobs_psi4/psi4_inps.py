@@ -1994,6 +1994,7 @@ set {{
 
 def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
     job_dirs = []
+    id_label = js.id_label
     for i in level_of_theories:
         method_basisset_mode = i.split("/")
         if len(method_basisset_mode) == 3:
@@ -2001,8 +2002,9 @@ def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
             js.extra_info["bsse_type"] = mode
             i = f"{method}/{basis}"
         js.extra_info["level_theory"] = [i]
+        print(i)
         output = compute_nbf_ne(js)
-        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{js.id_label}"
+        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{id_label}"
         job_dir = generate_job_dir(js, i, sub_job=mode)
         print(job_dir + "/p4.in")
         fps = generate_energy_psi4_input_file(js, sub_job=mode)
