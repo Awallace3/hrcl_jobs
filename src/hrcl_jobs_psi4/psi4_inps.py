@@ -1,3 +1,4 @@
+import signal
 import os
 import numpy as np
 from .jobspec import mp_js, grimme_js, saptdft_js, mp_mon_js
@@ -12,7 +13,7 @@ from pprint import pprint as pp
 from . import methods
 import subprocess
 import math
-
+import copy
 
 
 """
@@ -21,7 +22,6 @@ import math
 h2kcalmol = constants.conversion_factor("hartree", "kcal / mol")
 
 # Seg Fault Handler
-import signal
 # import faulthandler
 #
 # faulthandler.enable()
@@ -29,6 +29,7 @@ import signal
 
 class SegFault(Exception):
     pass
+
 
 # def handler(sigNum, frame):
 #     print("segfault captured. Moving onto next computation.")
@@ -41,7 +42,6 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-
 
 
 def psi4_vac_mp(
@@ -586,12 +586,12 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
         weak_pair_algo = js.extra_info["options"].get("WEAK_PAIR_ALGORITHM", "")
         sub_dir = ""
         if pno_convergence.upper() != "NORMAL":
-            sub_dir += pno_convergence.upper() 
+            sub_dir += pno_convergence.upper()
         if weak_pair_algo != "":
-            sub_dir += weak_pair_algo.upper() 
+            sub_dir += weak_pair_algo.upper()
         job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         try:
-        # should be using git@github.com:Awallace3/psi4.git -b dlpno_ccsd_t_upstream
+            # should be using git@github.com:Awallace3/psi4.git -b dlpno_ccsd_t_upstream
             output_information = f"{os.getcwd()}/{job_dir}/many_body.out"
             os.environ["PSI4_MANY_BODY_OUTPUT"] = output_information
             ie = psi4.energy(f"{l}", bsse_type=bsse_type)
@@ -601,9 +601,15 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                 np.array(
                     [
                         # dimer, monomerA, monomerB
-                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
-                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
-                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD TOTAL ENERGY"],
+                        data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD TOTAL ENERGY"
+                        ],
+                        data["1_((1,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD TOTAL ENERGY"
+                        ],
+                        data["1_((2,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD TOTAL ENERGY"
+                        ],
                     ]
                 )
             )
@@ -611,9 +617,15 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                 np.array(
                     [
                         # dimer, monomerA, monomerB
-                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
-                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
-                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD CORRELATION ENERGY"],
+                        data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD CORRELATION ENERGY"
+                        ],
+                        data["1_((1,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD CORRELATION ENERGY"
+                        ],
+                        data["1_((2,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "CCSD CORRELATION ENERGY"
+                        ],
                     ]
                 )
             )
@@ -621,9 +633,15 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                 np.array(
                     [
                         # dimer, monomerA, monomerB
-                        data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
-                        data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
-                        data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["MP2 TOTAL ENERGY"],
+                        data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "MP2 TOTAL ENERGY"
+                        ],
+                        data["1_((1,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "MP2 TOTAL ENERGY"
+                        ],
+                        data["1_((2,), (1, 2))"]["result"]["extras"]["qcvars"][
+                            "MP2 TOTAL ENERGY"
+                        ],
                     ]
                 )
             )
@@ -632,9 +650,15 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                     np.array(
                         [
                             # dimer, monomerA, monomerB
-                            data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
-                            data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
-                            data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) TOTAL ENERGY"],
+                            data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) TOTAL ENERGY"
+                            ],
+                            data["1_((1,), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) TOTAL ENERGY"
+                            ],
+                            data["1_((2,), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) TOTAL ENERGY"
+                            ],
                         ]
                     )
                 )
@@ -642,18 +666,26 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
                     np.array(
                         [
                             # dimer, monomerA, monomerB
-                            data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
-                            data["1_((1,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
-                            data["1_((2,), (1, 2))"]['result']['extras']['qcvars']["CCSD(T) CORRELATION ENERGY"],
+                            data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) CORRELATION ENERGY"
+                            ],
+                            data["1_((1,), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) CORRELATION ENERGY"
+                            ],
+                            data["1_((2,), (1, 2))"]["result"]["extras"]["qcvars"][
+                                "CCSD(T) CORRELATION ENERGY"
+                            ],
                         ]
                     )
                 )
             if disp_correction:
                 es.append(
-                    data["1_((1, 2), (1, 2))"]['result']['extras']['qcvars']["DLPNO-CCSD DISPERSION CORRECTION"],
+                    data["1_((1, 2), (1, 2))"]["result"]["extras"]["qcvars"][
+                        "DLPNO-CCSD DISPERSION CORRECTION"
+                    ],
                 )
         # except (Exception, SegFault) as e:
-        except (Exception) as e:
+        except Exception as e:
             print("Exception:", e)
             print("Exception!")
             es.append(None)
@@ -751,7 +783,7 @@ def run_method_IE(js: jobspec.sapt0_js) -> np.array:
             e = psi4.energy(f"{l}", bsse_type=cp)
             e *= constants.conversion_factor("hartree", "kcal / mol")
             mult = constants.conversion_factor("hartree", "kcal / mol")
-            out_energies = e 
+            out_energies = e
         except:
             print("Exception! Returning None")
             out_energies = None
@@ -822,7 +854,6 @@ def run_saptdft(js: saptdft_js) -> np.array:
         ma, charges=js.charges[1], ppm=js.mem, level_theory=js.level_theory
     )
     return shift_a
-
 
 
 def run_saptdft(js: saptdft_js) -> np.array:
@@ -1190,22 +1221,24 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
     # generate_outputs = "out" in js.extra_info.keys()
     for lt in js.extra_info["level_theory"]:
         m, b = lt.split("/")
-        # generate_outputs = js.extra_info.pop("out", None)
+        generate_outputs = js.extra_info.pop("out", None)
         handle_hrcl_extra_info_options(js, lt)
-        # if generate_outputs:
-        #     js.extra_info['out'] = generate_outputs
+        if generate_outputs:
+            js.extra_info["out"] = generate_outputs
         mol = psi4.geometry(geom)
         psi4.set_options({"basis": b})
         wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
         wert = wfn.basisset()
         n_occupied = math.ceil((wfn.nalpha() + wfn.nbeta()) / 2)
         n_virtual = wert.nbf() - n_occupied
-        out_nbf_electrons = np.array([
-            wert.nbf(),
-            wfn.nalpha() + wfn.nbeta(),
-            n_occupied,
-            n_virtual,
-        ])
+        out_nbf_electrons = np.array(
+            [
+                wert.nbf(),
+                wfn.nalpha() + wfn.nbeta(),
+                n_occupied,
+                n_virtual,
+            ]
+        )
         output.append(out_nbf_electrons)
     return output
 
@@ -1534,10 +1567,9 @@ def run_saptdft_grac_shift(
         handle_hrcl_extra_info_options(js, l, sub_job)
         E_cation, wfn_c = psi4.energy(l, return_wfn=True, molecule=mol_cation)
         neut_geom = mol_neutral.to_arrays()[0]
-        cati_geom =  mol_cation.to_arrays()[0]
+        cati_geom = mol_cation.to_arrays()[0]
         print(neut_geom)
         print(cati_geom)
-
 
         print(f"{E_neutral = }, {E_cation = }, {HOMO = }")
         grac = E_cation - E_neutral + HOMO
@@ -1553,12 +1585,12 @@ def run_saptdft_grac_shift(
         out.append(grac)
         handle_hrcl_psi4_cleanup(js, l, sub_job)
         # except (psi4.SCFConvergenceError, Exception) as e:
-            # out.append(None)
-            # out.append(None)
-            # out.append(None)
-            # out.append(None)
-            # print(e)
-            # handle_hrcl_psi4_cleanup(js, l, sub_job)
+        # out.append(None)
+        # out.append(None)
+        # out.append(None)
+        # out.append(None)
+        # print(e)
+        # handle_hrcl_psi4_cleanup(js, l, sub_job)
     return out
 
 
@@ -1800,6 +1832,7 @@ def run_MBIS_monomer(js: jobspec.monomer_js, print_energies=False) -> np.array:
                 es.append(None)
     return es
 
+
 def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
     generate_outputs = "out" in js.extra_info.keys()
     es = []
@@ -1817,7 +1850,9 @@ def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
         mol = psi4.geometry(geom)
         psi4.set_options({"basis": b})
         try:
-            wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
+            wfn = psi4.core.Wavefunction.build(
+                mol, psi4.core.get_global_option("BASIS")
+            )
             wert = wfn.basisset()
             output.extend([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
         except Exception as e:
@@ -1848,8 +1883,13 @@ def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
 
 
 def create_psi4_input_file(
-    js: jobspec.sapt0_js, helper_code=True, input_type="psiapi", id=None,
-    execute_input=False
+    js: jobspec.sapt0_js,
+    helper_code=True,
+    input_type="psiapi",
+    id=None,
+    execute_input=False,
+    sbatch_submission=False,
+    sub_job=None,
 ) -> np.array:
     job_label = f"{js.id_label}"
     print(f"Processing {job_label}")
@@ -1865,14 +1905,17 @@ def create_psi4_input_file(
         paren_t = "(t)" in l.lower()
         disp_correction = "DISPERSION_CORRECTION" in js.extra_info["options"].keys()
         mol = psi4.geometry(geom)
-        sub_dir = 0
-        pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
-        weak_pair_algo = js.extra_info["options"].get("WEAK_PAIR_ALGORITHM", "")
-        sub_dir = ""
-        if pno_convergence.upper() != "NORMAL":
-            sub_dir += pno_convergence.upper()
-        if weak_pair_algo != "":
-            sub_dir += weak_pair_algo.upper()
+        if sub_job is None:
+            sub_dir = 0
+            pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
+            weak_pair_algo = js.extra_info["options"].get("WEAK_PAIR_ALGORITHM", "")
+            sub_dir = ""
+            if pno_convergence.upper() != "NORMAL":
+                sub_dir += pno_convergence.upper()
+            if weak_pair_algo != "":
+                sub_dir += weak_pair_algo.upper()
+        else:
+            sub_dir = sub_job
         job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
         os.makedirs(job_dir, exist_ok=True)
         opts = ""
@@ -1896,12 +1939,17 @@ def create_psi4_input_file(
             file_name += f"/p4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
-        function_call = js.extra_info['function_call'].replace("<ID>", job_label)
+        function_call = js.extra_info["function_call"].replace("<ID>", job_label)
+        psi4_set_num_threads = js.extra_info.get("num_threads", None)
+        if psi4_set_num_threads is not None:
+            set_num_threads = f"psi4.core.set_num_threads({psi4_set_num_threads})\n"
+        else:
+            set_num_threads = "\n"
 
         np_encoder = (
-            """
-import json
+            """import json
 import numpy as np
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -1931,8 +1979,8 @@ with open("vars.json", "w") as f:
 
 {np_encoder}
 psi4.set_memory('{js.mem}')
-
-mol = psi4.geometry({geom}) 
+{set_num_threads}
+mol = psi4.geometry({geom})
 
 psi4.set_options({options})
 
@@ -1960,22 +2008,26 @@ set {{
             raise NotImplementedError()
         else:
             raise ValueError(f"input_type {input_type} not recognized")
-    if js.extra_info.get('sbatch_file', None):
-        sbatch_file = js.extra_info['sbatch_file'].replace("<ID>", job_label)
+    if js.extra_info.get("sbatch_file", None):
+        sbatch_file = js.extra_info["sbatch_file"].replace("<ID>", job_label)
         # check sbatch file for #SBATCH -J* and compare with squeue -u $USER
         # jobs to ensure that job isn't already in the queue
-        job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
-        check_ouptut = subprocess.check_output("""squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""", shell=True).decode()
-        if job_name in check_ouptut:
-            print(f"Job {job_name} already in the queue. Not submitting.")
-            return [None for i in range(len(js.extra_info["level_theory"]))]
         with open(f"{job_dir}/sbatch.sh", "w") as f:
             f.write(sbatch_file)
-        def_dir = os.getcwd()
-        os.chdir(job_dir)
-        print(f"Running sbatch in {job_dir}")
-        os.system(f"sbatch sbatch.sh")
-        os.chdir(def_dir)
+        if sbatch_submission:
+            job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
+            check_ouptut = subprocess.check_output(
+                """squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""",
+                shell=True,
+            ).decode()
+            if job_name in check_ouptut:
+                print(f"Job {job_name} already in the queue. Not submitting.")
+                return [None for i in range(len(js.extra_info["level_theory"]))]
+            def_dir = os.getcwd()
+            os.chdir(job_dir)
+            print(f"Running sbatch in {job_dir}")
+            os.system(f"sbatch sbatch.sh")
+            os.chdir(def_dir)
     if execute_input:
         def_dir = os.getcwd()
         os.chdir(job_dir)
@@ -1994,7 +2046,7 @@ set {{
 
 def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
     job_dirs = []
-    id_label = js.id_label
+    id = js.id_label
     for i in level_of_theories:
         method_basisset_mode = i.split("/")
         if len(method_basisset_mode) == 3:
@@ -2004,7 +2056,8 @@ def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
         js.extra_info["level_theory"] = [i]
         print(i)
         output = compute_nbf_ne(js)
-        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{id_label}"
+        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{id}"
+        print(js.id_label)
         job_dir = generate_job_dir(js, i, sub_job=mode)
         print(job_dir + "/p4.in")
         fps = generate_energy_psi4_input_file(js, sub_job=mode)
