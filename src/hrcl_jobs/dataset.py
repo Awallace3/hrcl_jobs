@@ -71,9 +71,9 @@ def machine_dict_resources(
     if uname_n == unames[0]:
         on_rank_0 = True
 
-    if rank_0_one_thread and on_rank_0:
+    if rank_0_one_thread and on_rank_0 and PARALLEL:
         threads -= 1
-        # current_machine_cnt -= 1
+        current_machine_cnt -= 1
         memory -= 4
 
     print(threads, current_machine_cnt)
@@ -320,12 +320,6 @@ def compute_energy(
     method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
     js_obj, js_headers, run_js_job = hrcl_psi4.get_parallel_functions(method)
     table_cols, col_check = hrcl_psi4.get_col_check(method, col_check.split("_")[-1])
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    num_procs = comm.Get_size()
-    print(f"{rank = } {memory_per_thread = } ")
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
     con, cur = sqlt.establish_connection(DB_NAME)

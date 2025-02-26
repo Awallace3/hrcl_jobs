@@ -11,6 +11,7 @@ import qcelemental as qcel
 from pprint import pprint as pp
 from . import methods
 import subprocess
+import math
 
 
 
@@ -1137,8 +1138,7 @@ def options_dict_to_psi4_options(options):
     )
 
 
-def generate_energy_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
-    generate_outputs = "out" in js.extra_info.keys()
+def generate_energy_psi4_input_file(js: jobspec.sapt0_js, sub_job=0) -> np.array:
     extra_geom_info = js.extra_info.get("geometry_options", None)
     geom = tools.generate_p4input_from_df(
         js.geometry,
@@ -1148,13 +1148,14 @@ def generate_energy_psi4_input_file(js: jobspec.sapt0_js) -> np.array:
         units="angstrom",
         extra=extra_geom_info,
     )
-    es = []
-    verbosity = js.extra_info.get("verbosity", None)
-    generate_outputs = "out" in js.extra_info.keys()
-    set_scratch = "scratch" in js.extra_info.keys()
-    for l in js.extra_info["level_theory"]:
-        job_dir = generate_job_dir(js, l, sub_job=0)
+    fps = []
+    for lt in js.extra_info["level_theory"]:
+        job_dir = generate_job_dir(js, lt, sub_job=sub_job)
         os.makedirs(job_dir, exist_ok=True)
+        bsse_type = js.extra_info.get("bsse_type", None)
+        bsse_str = ""
+        if bsse_type:
+            bsse_str = f", bsse_type='{bsse_type}'"
         input_information = f"""
 memory {js.mem}
 
@@ -1162,18 +1163,20 @@ set {options_dict_to_psi4_options(js.extra_info["options"])}
 
 molecule mol {{\n{geom}\n}}
 
-energy('{l}')
+energy('{lt}'{bsse_str})
 """
-        with open(f"{job_dir}/p4.in", "w") as f:
+        filepath = f"{job_dir}/p4.in"
+        print(f"Writing to\n{filepath}")
+        with open(filepath, "w") as f:
             f.write(input_information)
-    return
+        fps.append(filepath)
+    return fps
 
 
 def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
     """
     create_mp_js_grimme turns mp_js object into a psi4 job and runs it
     """
-    generate_outputs = "out" in js.extra_info.keys()
     extra_geom_info = js.extra_info.get("geometry_options", None)
     geom = tools.generate_p4input_from_df(
         js.geometry,
@@ -1184,15 +1187,25 @@ def compute_nbf_ne(js: jobspec.sapt0_js) -> np.array:
         extra=extra_geom_info,
     )
     output = []
-    verbosity = js.extra_info.get("verbosity", None)
-    for l in js.extra_info["level_theory"]:
-        m, b = l.split("/")
-        handle_hrcl_extra_info_options(js, l)
+    # generate_outputs = "out" in js.extra_info.keys()
+    for lt in js.extra_info["level_theory"]:
+        m, b = lt.split("/")
+        # generate_outputs = js.extra_info.pop("out", None)
+        handle_hrcl_extra_info_options(js, lt)
+        # if generate_outputs:
+        #     js.extra_info['out'] = generate_outputs
         mol = psi4.geometry(geom)
         psi4.set_options({"basis": b})
         wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
         wert = wfn.basisset()
-        out_nbf_electrons = np.array([wert.nbf(), wfn.nalpha() + wfn.nbeta()])
+        n_occupied = math.ceil((wfn.nalpha() + wfn.nbeta()) / 2)
+        n_virtual = wert.nbf() - n_occupied
+        out_nbf_electrons = np.array([
+            wert.nbf(),
+            wfn.nalpha() + wfn.nbeta(),
+            n_occupied,
+            n_virtual,
+        ])
         output.append(out_nbf_electrons)
     return output
 
@@ -1977,3 +1990,27 @@ set {{
             raise ValueError(f"input_type {input_type} not recognized")
         os.chdir(def_dir)
     return [None for i in range(len(js.extra_info["level_theory"]))]
+
+
+def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
+    job_dirs = []
+    id_label = js.id_label
+    for i in level_of_theories:
+        method_basisset_mode = i.split("/")
+        if len(method_basisset_mode) == 3:
+            method, basis, mode = method_basisset_mode
+            js.extra_info["bsse_type"] = mode
+            i = f"{method}/{basis}"
+        js.extra_info["level_theory"] = [i]
+        print(i)
+        output = compute_nbf_ne(js)
+        js.id_label = f"nocc_{output[0][2]}_nvirt_{output[0][3]}_id_{id_label}"
+        job_dir = generate_job_dir(js, i, sub_job=mode)
+        print(job_dir + "/p4.in")
+        fps = generate_energy_psi4_input_file(js, sub_job=mode)
+        job_dir = fps[0]
+        if len(method_basisset_mode) == 3:
+            js.extra_info.pop("bsse_type")
+        mode = 0
+        job_dirs.append(job_dir)
+    return job_dirs
