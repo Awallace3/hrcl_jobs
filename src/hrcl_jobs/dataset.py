@@ -288,13 +288,28 @@ def compute_energy(
     DB_NAME,
     TABLE_NAME,
     col_check="SAPT0_adz",
-    machine_dict=True,
+    machine_dict=None,
     hive_params=HIVE_PARAMS,
     TESTING=False,
     options=None,
     xtra=None,
     output_root="schr",
 ) -> None:
+    """
+    machine_dict: dict[str, parallel.machineResources]
+        A dictionary containing machine names as keys and
+        their corresponding resources as values. Example:
+        machine_dict = {
+            "ds1": parallel.machineResources("ds1", 6, 6, 58),
+            "ds10": parallel.machineResources("ds1", 6, 6, 58),
+            "ds2": parallel.machineResources("ds2", 10, 20, 125),
+            "hex6": parallel.machineResources("hex6", 6, 6, 62),
+            "hex8": parallel.machineResources("hex8", 6, 6, 62),
+            "hex9": parallel.machineResources("hex9", 6, 6, 58),
+            "hex11": parallel.machineResources("hex11", 6, 6, 62),
+            "hornet": parallel.machineResources("hornet", 24, 24, 160),
+        }
+    """
     if machine_dict:
         machine = machine_dict_resources(machine_dict=machine_dict)
         memory_per_thread = f"{machine.memory_per_thread} gb"
