@@ -1889,6 +1889,7 @@ def create_psi4_input_file(
     id=None,
     execute_input=False,
     sbatch_submission=False,
+    override_submission=False,
     sub_job=None,
 ) -> np.array:
     job_label = f"{js.id_label}"
@@ -2015,14 +2016,15 @@ set {{
         with open(f"{job_dir}/sbatch.sh", "w") as f:
             f.write(sbatch_file)
         if sbatch_submission:
-            job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
-            check_ouptut = subprocess.check_output(
-                """squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""",
-                shell=True,
-            ).decode()
-            if job_name in check_ouptut:
-                print(f"Job {job_name} already in the queue. Not submitting.")
-                return [None for i in range(len(js.extra_info["level_theory"]))]
+            if not override_submission:
+                job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
+                check_ouptut = subprocess.check_output(
+                    """squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""",
+                    shell=True,
+                ).decode()
+                if job_name in check_ouptut:
+                    print(f"Job {job_name} already in the queue. Not submitting.")
+                    return [None for i in range(len(js.extra_info["level_theory"]))]
             def_dir = os.getcwd()
             os.chdir(job_dir)
             print(f"Running sbatch in {job_dir}")
