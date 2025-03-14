@@ -1,3 +1,4 @@
+# List of supported simple basis sets
 simple_basis_sets = [
     "aug-cc-pvdz",
     "aug-cc-pvtz",
@@ -9,39 +10,42 @@ simple_basis_sets = [
     "may-cc-pvtz",
 ]
 
+
 def get_basis_set(basis_str: str) -> str:
+    """
+    Converts abbreviated basis set names to their full form.
+
+    Args:
+        basis_str (str): Abbreviated or full basis set name
+
+    Returns:
+        str: Full basis set name recognized by Psi4
+
+    Raises:
+        ValueError: If the basis set abbreviation is not recognized
+
+    Examples:
+        >>> get_basis_set("adz")
+        "aug-cc-pvdz"
+        >>> get_basis_set("tz")
+        "cc-pvtz"
+    """
     basis_str = basis_str.lower()
     if basis_str in simple_basis_sets:
         return basis_str
-    elif basis_str == "adz":
-        basis = "aug-cc-pvdz"
-    elif basis_str == "atz":
-        basis = "aug-cc-pvtz"
-    elif basis_str == "qz":
-        basis = "cc-pvqz"
-    elif basis_str == "aqz":
-        basis = "aug-cc-pvqz"
-    elif basis_str == "jdz":
-        basis = "jun-cc-pvdz"
-    elif basis_str == "jtz":
-        basis = "jun-cc-pvtz"
-    elif basis_str == "dz":
-        basis = "cc-pvdz"
-    elif basis_str == "tz":
-        basis = "cc-pvtz"
-    elif basis_str == "mtz":
-        basis = "may-cc-pvtz"
-    elif basis_str == "adtz":
-        basis = "aug-cc-pv[dt]z"
-    elif basis_str == "dtz":
-        basis = "cc-pv[dt]z"
-    elif basis_str == "atqz":
-        basis = "aug-cc-pv[tq]z"
-    elif basis_str == "tqz":
-        basis = "cc-pv[tq]z"
-    else:
-        print(f"Basis Set Abbreviation: {basis_str}")
-        raise ValueError(
-            "Basis Set Abbreviation not recognized by hrcl_jobs_psi4.basis_sets.py"
-        )
-    return basis
+    basis_dict = {
+        "adz": "aug-cc-pvdz",
+        "atz": "aug-cc-pvtz",
+        "qz": "cc-pvqz",
+        "aqz": "aug-cc-pvqz",
+        "jdz": "jun-cc-pvdz",
+        "jtz": "jun-cc-pvtz",
+        "dz": "cc-pvdz",
+        "tz": "cc-pvtz",
+        "mtz": "may-cc-pvtz",
+        "adtz": "aug-cc-pv[dt]z",
+        "dtz": "cc-pv[dt]z",
+        "atqz": "aug-cc-pv[tq]z",
+        "tqz": "cc-pv[tq]z",
+    }
+    return basis_dict[basis_str]
