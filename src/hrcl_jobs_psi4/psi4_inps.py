@@ -1456,7 +1456,7 @@ def generate_job_dir(js, l, sub_job):
     return job_dir
 
 
-def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False):
+def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False, set_output_file=True):
     psi4.set_memory(js.mem)
     psi4.set_options(js.extra_info["options"])
     generate_outputs = "out" in js.extra_info.keys()
@@ -1470,8 +1470,9 @@ def handle_hrcl_extra_info_options(js, l, sub_job=0, psi4_quiet=False):
     if generate_outputs:
         job_dir = generate_job_dir(js, l, sub_job)
         os.makedirs(job_dir, exist_ok=True)
-        psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
-        psi4.core.print_out(f"{js}")
+        if set_output_file:
+            psi4.set_output_file(f"{job_dir}/psi4.out", False, loglevel=10)
+            psi4.core.print_out(f"{js}")
     elif psi4_quiet:
         psi4.core.be_quiet()
     if "num_threads" in js.extra_info.keys():
@@ -1890,22 +1891,27 @@ def create_psi4_input_file(
     execute_input=False,
     sbatch_submission=False,
     override_submission=False,
+    skip_existing=None,
     sub_job=None,
 ) -> np.array:
     job_label = f"{js.id_label}"
     print(f"Processing {job_label}")
     generate_outputs = "out" in js.extra_info.keys()
-    geom = tools.generate_p4input_from_df(
-        js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
-    )
+    if isinstance(js, jobspec.mon_js):
+        nmers = 1
+        geom = tools.generate_p4input_from_df(
+            js.geometry, js.charges, None, None, units="angstrom"
+        )
+    else:
+        nmers = 2
+        geom = tools.generate_p4input_from_df(
+            js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
+        )
     es = []
     if not generate_outputs:
         print("No output file specified. Not generating input files.")
     for l in js.extra_info["level_theory"]:
         # sub_job = js.extra_info["options"]["pno_convergence"]
-        paren_t = "(t)" in l.lower()
-        disp_correction = "DISPERSION_CORRECTION" in js.extra_info["options"].keys()
-        mol = psi4.geometry(geom)
         if sub_job is None:
             sub_dir = 0
             pno_convergence = js.extra_info["options"].get("PNO_CONVERGENCE", "NORMAL")
@@ -1917,8 +1923,13 @@ def create_psi4_input_file(
                 sub_dir += weak_pair_algo.upper()
         else:
             sub_dir = sub_job
-        job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir)
-        os.makedirs(job_dir, exist_ok=True)
+        job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir, set_output_file=False)
+        if skip_existing:
+            if os.path.exists(job_dir + "/" + skip_existing):
+                print(f"Skipping {job_dir}")
+                return
+        if job_dir:
+            os.makedirs(job_dir, exist_ok=True)
         opts = ""
         first = True
         for k, v in js.extra_info["options"].items():
@@ -1927,7 +1938,7 @@ def create_psi4_input_file(
             else:
                 first = False
             opts += f"    {k} {v}"
-        file_name = f"{job_dir}"
+        file_name = f"{job_dir}" if job_dir else "."
         if id is not None:
             id = f"_{id}"
         else:

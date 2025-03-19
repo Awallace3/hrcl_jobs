@@ -173,6 +173,14 @@ class saptdft_js:
     mem: str = "8 gb"
 
 
+@dataclass
+class mon_js:
+    id_label: int
+    geometry: np.array
+    charges: np.array
+    extra_info: {}
+    mem: str = "8 gb"
+
 def saptdft_js_headers():
     return [
         "id",
