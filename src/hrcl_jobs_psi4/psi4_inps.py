@@ -2032,7 +2032,7 @@ set {{
             if not override_submission:
                 job_name = sbatch_file.split("-J")[1].split()[0].split("\n")[0]
                 check_ouptut = subprocess.check_output(
-                    """squeue -u $USER --format="%.8i %.10P %.20j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""",
+                    """squeue -u $USER --format="%.8i %.10P %.100j %.8u %.2t %.10M %.4D %R" | awk '{ print $3 }'""",
                     shell=True,
                 ).decode()
                 if job_name in check_ouptut:
