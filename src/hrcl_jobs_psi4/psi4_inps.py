@@ -1893,8 +1893,10 @@ def create_psi4_input_file(
     override_submission=False,
     skip_existing=None,
     sub_job=None,
+    job_label=None,
 ) -> np.array:
-    job_label = f"{js.id_label}"
+    if job_label is None:
+        job_label = f"{js.id_label}"
     print(f"Processing {job_label}")
     generate_outputs = "out" in js.extra_info.keys()
     if isinstance(js, jobspec.mon_js):
