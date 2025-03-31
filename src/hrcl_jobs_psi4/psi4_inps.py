@@ -174,9 +174,16 @@ def prep_mol(R, Z, TQ, E, ending_tags=True):
 
 def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=tools.create_pt_dict()):
     """
-    returns [
-        vac_multipole_AB,
-    ]
+    Executes a multipole job specification for a dimer only,
+    calculating only vacuum multipoles.
+    
+    Args:
+        js (jobspec.mp_js): Job specification containing molecular data and parameters
+        el_dc (dict, optional): Element dictionary mapping atomic numbers to element symbols.
+                                Defaults to tools.create_pt_dict().
+    
+    Returns:
+        list: [vac_multipole_AB] - Array containing vacuum multipoles for the dimer
     """
     level_theory = js.level_theory[0]
     EA = np.array([el_dc[i] for i in js.ZA])
@@ -194,11 +201,16 @@ def run_mp_js_job_only_dimer_mp_only(js: mp_js, el_dc=tools.create_pt_dict()):
 
 def run_mp_js_job_only_dimer(js: mp_js, el_dc=tools.create_pt_dict()):
     """
-    returns [
-        vac_multipole_AB,
-        vac_widths_AB,
-        vac_vol_rat_AB,
-    ]
+    Executes a multipole job specification for a dimer only,
+    calculating multipoles, widths, and volume ratios.
+    
+    Args:
+        js (jobspec.mp_js): Job specification containing molecular data and parameters
+        el_dc (dict, optional): Element dictionary mapping atomic numbers to element symbols.
+                                Defaults to tools.create_pt_dict().
+    
+    Returns:
+        list: [vac_multipole_AB, vac_widths_AB, vac_vol_rat_AB] - Arrays for the dimer
     """
     level_theory = js.level_theory[0]
     EA = np.array([el_dc[i] for i in js.ZA])
@@ -511,6 +523,18 @@ def run_psi4_sapt0(
 
 
 def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
+    """
+    Runs SAPT(DFT) calculations and extracts energy components.
+    
+    Args:
+        js (jobspec.saptdft_js): Job specification containing molecular data, 
+                                 GRAC shift parameters, and calculation options
+    
+    Returns:
+        np.array: Array of energy component results for each level of theory:
+                 [[ie, ELST, EXCH, IND, DISP], ...] in kcal/mol
+                 May include additional components if DDFT and D4 calculations are requested
+    """
     if isinstance(js.geometry, list):
         js.geometry = np.array(js.geometry)
         js.monAs = np.array(js.monAs)
@@ -562,6 +586,21 @@ def run_saptdft_components(js: jobspec.saptdft_js) -> np.array:
 
 
 def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
+    """
+    Runs DLPNO-CCSD (Domain-based Local Pair Natural Orbital CCSD) interaction energy calculations.
+    
+    Args:
+        js (jobspec.sapt0_js): Job specification containing dimer and monomer data
+    
+    Returns:
+        np.array: Array containing various energy components:
+                 - Interaction energy
+                 - Arrays of total energies for dimer, monomerA, monomerB
+                 - Arrays of correlation energies for dimer, monomerA, monomerB
+                 - Arrays of MP2 energies for dimer, monomerA, monomerB
+                 - Arrays of CCSD(T) energies if requested
+                 - Dispersion correction if requested
+    """
     generate_outputs = "out" in js.extra_info.keys()
     if isinstance(js.geometry, list):
         js.geometry = np.array(js.geometry)
@@ -702,6 +741,17 @@ def run_dlpno_ccsd_ie(js: jobspec.sapt0_js) -> np.array:
 
 
 def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
+    """
+    Runs DFT-D4 dispersion-corrected interaction energy calculations.
+    
+    Args:
+        js (jobspec.sapt0_js): Job specification containing dimer and monomer data
+    
+    Returns:
+        np.array: Array containing:
+                 - DFT interaction energy (kcal/mol)
+                 - D4 interaction energy (kcal/mol)
+    """
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -738,6 +788,15 @@ def run_dftd4_ie(js: jobspec.sapt0_js) -> np.array:
 
 
 def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
+    """
+    Runs SAPT2+3 calculations for interaction energy components.
+    
+    Args:
+        js (jobspec.sapt_js): Job specification containing dimer and monomer data
+    
+    Returns:
+        np.array: Array of interaction energy values in kcal/mol
+    """
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -767,7 +826,13 @@ def run_sapt2p3(js: jobspec.sapt_js) -> np.array:
 
 def run_method_IE(js: jobspec.sapt0_js) -> np.array:
     """
-    Untested
+    Runs generic interaction energy calculations with specified method.
+    
+    Args:
+        js (jobspec.sapt0_js): Job specification containing dimer and monomer data
+    
+    Returns:
+        np.array: Array of interaction energy values in kcal/mol for each level of theory
     """
     generate_outputs = "out" in js.extra_info.keys()
     # check if js.monAs np.size is 1, and if not flatten
@@ -803,7 +868,27 @@ def run_psi4_saptdft(
     sapt_dft_grac_shift_a: float = 1e-16,
     sapt_dft_grac_shift_b: float = 1e-16,
 ) -> []:
-    """ """
+    """
+    Runs SAPT(DFT) calculations with specified GRAC shift parameters.
+    
+    Args:
+        A (str): Molecular geometry string for monomer A
+        B (str): Molecular geometry string for monomer B
+        ppm (str, optional): Memory allocation. Defaults to "4 gb".
+        level_theory (list, optional): List of theory level strings. Defaults to ["hf/cc-pvdz"].
+        charge_mult (np.array, optional): Charge and multiplicity for dimer, monomer A, monomer B.
+                                         Defaults to [[0,1], [0,1], [0,1]].
+        d_convergence (int, optional): Convergence criterion for SCF. Defaults to 4.
+        scf_type (str, optional): SCF algorithm type. Defaults to "df".
+        sapt_dft_grac_shift_a (float, optional): GRAC shift parameter for monomer A. 
+                                                Defaults to 1e-16.
+        sapt_dft_grac_shift_b (float, optional): GRAC shift parameter for monomer B. 
+                                                Defaults to 1e-16.
+    
+    Returns:
+        list: List of energy component arrays [total, ELST, EXCH, IND, DISP] in kcal/mol 
+              for each theory level
+    """
     A_cm = charge_mult[1, :]
     B_cm = charge_mult[2, :]
     geom = f"{A_cm[0]} {A_cm[1]}\n{A}\n--\n{B_cm[0]} {B_cm[1]}\n{B}"
@@ -947,7 +1032,16 @@ def run_GRAC_shift(
     js: saptdft_js,
 ) -> np.array:
     """
-    run_dft_neutral_cation
+    Calculates GRAC (Gradient-Regulated Asymptotic Correction) shift parameters 
+    for SAPT(DFT) calculations.
+    
+    Args:
+        js (jobspec.saptdft_js): Job specification containing dimer and monomer data
+    
+    Returns:
+        np.array: Array containing information for both monomers:
+                 [[e_neutral_A, e_cation_A, HOMO_A, grac_A], 
+                  [e_neutral_B, e_cation_B, HOMO_B, grac_B]]
     """
     from psi4.driver.procrouting import proc_util
 
@@ -1027,7 +1121,18 @@ def run_dft_neutral_cation(
     M, charges, ppm, level_theory, d_convergence="8"
 ) -> np.array:
     """
-    run_dft_neutral_cation
+    Runs DFT calculations on neutral and cationic species to determine GRAC shift parameters.
+    
+    Args:
+        M (str): Molecular geometry string
+        charges (np.array): Charge and multiplicity information
+        ppm (str): Memory allocation
+        level_theory (list): List of theory level strings
+        d_convergence (str, optional): Convergence criterion for SCF. Defaults to "8".
+    
+    Returns:
+        np.array: Array containing for each theory level:
+                 [e_neutral, e_cation, HOMO, grac]
     """
     geom_neutral = f"{charges[0]} {charges[1]}\n{M}"
     geom_cation = f"{charges[0]+1} {charges[1]+1}\n{M}"
@@ -1159,6 +1264,15 @@ def run_psi4_dimer_energy(
 
 
 def options_dict_to_psi4_options(options):
+    """
+    Converts a dictionary of options to a string formatted for Psi4 input files.
+    
+    Args:
+        options (dict): Dictionary of Psi4 options
+    
+    Returns:
+        str: Formatted string for Psi4 input files
+    """
     replacements = ['"', "'"]
     return (
         str(options)
@@ -1444,6 +1558,17 @@ def run_psi4_dimer_ie_output_files(js: jobspec.psi4_dimer_js):
 
 
 def generate_job_dir(js, l, sub_job):
+    """
+    Generates a directory path for job output based on job specification.
+    
+    Args:
+        js (jobspec.*): Job specification object
+        l (str): Level of theory string
+        sub_job (int or str): Sub-job identifier
+    
+    Returns:
+        str: Directory path for job output
+    """
     job_dir = js.extra_info["out"]["path"]
     clean_name = (
         l.replace("/", "_").replace("-", "_").replace("(", "_").replace(")", "_")
@@ -1596,6 +1721,17 @@ def run_saptdft_grac_shift(
 
 
 def run_saptdft_sapt_2p3_s_inf(js: jobspec.saptdft_js) -> np.array:
+    """
+    Extracts information about S-infinity approximation terms from SAPT(DFT) 
+    and SAPT2+3 calculations.
+    
+    Args:
+        js (jobspec.saptdft_js): Job specification with Psi4 input string
+    
+    Returns:
+        np.array: Array containing:
+                 [EXCH-IND20,R (S^INF), SAPT EXCH-DISP20(S^INF), SAPT EXCH-IND30(S^INF)]
+    """
     generate_outputs = "out" in js.extra_info.keys()
     geom = js.psi4_input
     es = []
@@ -1696,6 +1832,16 @@ def MBIS_props_from_wfn(wfn):
 
 
 def MBIS_population(geometry: np.array, multipoles: np.ndarray):
+    """
+    Calculates atomic population (electrons) from MBIS multipoles.
+    
+    Args:
+        geometry (np.array): Atomic coordinates including atomic numbers
+        multipoles (np.ndarray): Multipole moments (charges, dipoles, quadrupoles)
+    
+    Returns:
+        np.ndarray: Array of electron populations for each atom
+    """
     population = np.zeros(len(geometry))
     for i, m in enumerate(multipoles):
         population[i] = geometry[i, 0] - m[0]
@@ -1895,6 +2041,23 @@ def create_psi4_input_file(
     sub_job=None,
     job_label=None,
 ) -> np.array:
+    """
+    Creates Psi4 input files for calculations in various formats.
+    
+    Args:
+        js (jobspec.sapt0_js): Job specification containing calculation details
+        helper_code (bool, optional): Whether to include helper code for results processing. 
+                                      Defaults to True.
+        input_type (str, optional): Type of input file to generate ("psiapi", "psithon", "qcschema"). 
+                                    Defaults to "psiapi".
+        id (str, optional): Identifier to include in filenames. Defaults to None.
+        execute_input (bool, optional): Whether to execute the generated input immediately. 
+                                       Defaults to False.
+    
+    Returns:
+        np.array: Array of None values, one for each level of theory
+                 (primarily for compatibility with other functions)
+    """
     if job_label is None:
         job_label = f"{js.id_label}"
     print(f"Processing {job_label}")
