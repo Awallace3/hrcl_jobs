@@ -1863,7 +1863,7 @@ def compute_nbf(js: jobspec.monomer_js, print_energies=False) -> np.array:
 
 
 def run_interaction_energy(js: jobspec.sapt0_js) -> np.array:
-    print("Processing")
+    # print("Processing")
     generate_outputs = "out" in js.extra_info.keys()
     geom = tools.generate_p4input_from_df(
         js.geometry, js.charges, js.monAs, js.monBs, units="angstrom"
@@ -1897,7 +1897,7 @@ def create_psi4_input_file(
 ) -> np.array:
     if job_label is None:
         job_label = f"{js.id_label}"
-    print(f"Processing {job_label}")
+    # print(f"Processing {job_label}")
     generate_outputs = "out" in js.extra_info.keys()
     if isinstance(js, jobspec.mon_js):
         nmers = 1
@@ -1948,9 +1948,9 @@ def create_psi4_input_file(
         if input_type == "psiapi":
             file_name += f"/p4{id}.py"
         elif input_type == "psithon":
-            file_name += f"/p4{id}.in"
+            file_name += f"p4{id}.in"
         elif input_type == "qcschema":
-            file_name += f"/p4{id}.json"
+            file_name += f"p4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
         function_call = js.extra_info["function_call"].replace("<ID>", job_label)
@@ -2016,7 +2016,7 @@ set {{
 
 {function_call}
 {save_results}"""
-            with open(f"{job_dir}/psi4.in", "w") as f:
+            with open(file_name, "w") as f:
                 f.write(input)
         elif input_type == "qcschema":
             raise NotImplementedError()
@@ -2056,7 +2056,7 @@ set {{
         else:
             raise ValueError(f"input_type {input_type} not recognized")
         os.chdir(def_dir)
-    return [None for i in range(len(js.extra_info["level_theory"]))]
+    return file_name 
 
 
 def level_of_theory_timings_input_files(level_of_theories, js, sub_job=0):
