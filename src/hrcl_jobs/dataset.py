@@ -128,7 +128,7 @@ def compute_MBIS(
     else:
         memory_per_thread = hive_params["mem_per_process"]
         num_omp_threads = hive_params["num_omp_threads"]
-    method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
+    method, basis_str, functional = hrcl_psi4.get_level_of_theory(col_check)
     basis = col_check.split("_")[-1]
     table_cols = {
         f"MBIS_{method}_multipoles_d_{basis}": "FLOAT",
@@ -216,7 +216,7 @@ def compute_MBIS_atom(
     else:
         memory_per_thread = hive_params["mem_per_process"]
         num_omp_threads = hive_params["num_omp_threads"]
-    method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
+    method, basis_str, functional = hrcl_psi4.get_level_of_theory(col_check)
     basis = col_check.split("_")[-1]
     table_cols = {
         f"MBIS_{method}_multipoles_{basis}": "FLOAT",
@@ -317,9 +317,10 @@ def compute_energy(
     else:
         memory_per_thread = hive_params["mem_per_process"]
         num_omp_threads = hive_params["num_omp_threads"]
-    method, basis_str = hrcl_psi4.get_level_of_theory(col_check)
-    js_obj, js_headers, run_js_job = hrcl_psi4.get_parallel_functions(method)
-    table_cols, col_check = hrcl_psi4.get_col_check(method, col_check.split("_")[-1])
+    method, basis_str, functional = hrcl_psi4.get_level_of_theory(col_check)
+    print(method, basis_str, functional)
+    js_obj, js_headers, run_js_job = hrcl_psi4.get_parallel_functions(method, functional)
+    table_cols, col_check = hrcl_psi4.get_col_check(method, col_check.split("_")[-1], options)
     if rank == 0:
         sqlt.create_update_table(DB_NAME, TABLE_NAME, table_cols=table_cols)
     con, cur = sqlt.establish_connection(DB_NAME)
