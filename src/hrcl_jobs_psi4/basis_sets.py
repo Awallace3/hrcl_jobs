@@ -10,6 +10,21 @@ simple_basis_sets = [
     "may-cc-pvtz",
 ]
 
+basis_dict = {
+    "adz": "aug-cc-pvdz",
+    "atz": "aug-cc-pvtz",
+    "qz": "cc-pvqz",
+    "aqz": "aug-cc-pvqz",
+    "jdz": "jun-cc-pvdz",
+    "jtz": "jun-cc-pvtz",
+    "dz": "cc-pvdz",
+    "tz": "cc-pvtz",
+    "mtz": "may-cc-pvtz",
+    "adtz": "aug-cc-pv[dt]z",
+    "dtz": "cc-pv[dt]z",
+    "atqz": "aug-cc-pv[tq]z",
+    "tqz": "cc-pv[tq]z",
+}
 
 def get_basis_set(basis_str: str) -> str:
     """
@@ -33,19 +48,4 @@ def get_basis_set(basis_str: str) -> str:
     basis_str = basis_str.lower()
     if basis_str in simple_basis_sets:
         return basis_str
-    basis_dict = {
-        "adz": "aug-cc-pvdz",
-        "atz": "aug-cc-pvtz",
-        "qz": "cc-pvqz",
-        "aqz": "aug-cc-pvqz",
-        "jdz": "jun-cc-pvdz",
-        "jtz": "jun-cc-pvtz",
-        "dz": "cc-pvdz",
-        "tz": "cc-pvtz",
-        "mtz": "may-cc-pvtz",
-        "adtz": "aug-cc-pv[dt]z",
-        "dtz": "cc-pv[dt]z",
-        "atqz": "aug-cc-pv[tq]z",
-        "tqz": "cc-pv[tq]z",
-    }
     return basis_dict[basis_str]
