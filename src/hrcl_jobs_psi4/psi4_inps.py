@@ -2089,10 +2089,6 @@ def create_psi4_input_file(
         else:
             sub_dir = sub_job
         job_dir = handle_hrcl_extra_info_options(js, l, sub_job=sub_dir, set_output_file=False)
-        if skip_existing:
-            if os.path.exists(job_dir + "/" + skip_existing):
-                print(f"Skipping {job_dir}")
-                return
         if job_dir:
             os.makedirs(job_dir, exist_ok=True)
         opts = ""
@@ -2116,6 +2112,8 @@ def create_psi4_input_file(
             file_name += f"p4{id}.json"
         else:
             raise ValueError(f"input_type {input_type} not recognized")
+        if skip_existing:
+            return file_name
         function_call = js.extra_info["function_call"].replace("<ID>", job_label)
         psi4_set_num_threads = js.extra_info.get("num_threads", None)
         if psi4_set_num_threads is not None:
